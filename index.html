@@ -112,11 +112,22 @@
     .file-meta { font-size: 12px; color: #999; margin-top: 2px; }
     .file-clear { font-size: 12px; color: #999; cursor: pointer; padding: 4px 8px; border: 1px solid #eee; border-radius: 6px; background: transparent; }
     .file-clear:hover { color: #c00; border-color: #fcc; background: #fff5f5; }
-    .col-picker { display: none; background: #fff; border: 1px solid #e5e5e5; border-radius: 10px; padding: 12px 16px; margin-bottom: 1rem; }
-    .col-picker.visible { display: block; }
-    .col-picker-label { font-size: 12px; color: #888; margin-bottom: 8px; }
-    .col-picker select { width: 100%; padding: 8px 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; background: #fafafa; }
-    .col-preview-text { font-size: 12px; color: #bbb; margin-top: 8px; }
+    .sheet-picker { display: none; background: #fff; border: 1px solid #e5e5e5; border-radius: 10px; padding: 14px 16px; margin-bottom: 1rem; }
+    .sheet-picker.visible { display: block; }
+    .sheet-picker-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #999; margin-bottom: 10px; }
+    .sheet-list { display: flex; flex-direction: column; gap: 10px; }
+    .sheet-row { background: #fafafa; border: 1px solid #ececec; border-radius: 8px; padding: 10px 12px; }
+    .sheet-row-top { display: flex; align-items: center; gap: 10px; margin-bottom: 0; }
+    .sheet-row.expanded .sheet-row-top { margin-bottom: 10px; }
+    .sheet-checkbox { width: 15px; height: 15px; cursor: pointer; flex-shrink: 0; accent-color: #1a1a1a; }
+    .sheet-name { font-size: 13px; font-weight: 500; color: #1a1a1a; flex: 1; }
+    .sheet-row-count { font-size: 11px; color: #bbb; white-space: nowrap; }
+    .sheet-col-wrap { display: none; padding-top: 2px; }
+    .sheet-row.expanded .sheet-col-wrap { display: block; }
+    .sheet-col-label { font-size: 11px; color: #999; margin-bottom: 6px; }
+    .sheet-col-select { width: 100%; padding: 7px 10px; border: 1px solid #ddd; border-radius: 7px; font-size: 13px; background: #fff; }
+    .sheet-col-preview { font-size: 11px; color: #bbb; margin-top: 6px; line-height: 1.5; }
+    .sheet-total { font-size: 12px; color: #888; margin-top: 10px; padding-top: 10px; border-top: 1px solid #f0f0f0; }
     .batch-run-btn { width: 100%; padding: 12px; background: #1a1a1a; color: #fff; border: none; border-radius: 10px; font-size: 14px; font-weight: 500; cursor: pointer; margin-bottom: 1.5rem; }
     .batch-run-btn:hover { background: #333; }
     .batch-run-btn:disabled { background: #999; cursor: not-allowed; }
@@ -324,7 +335,7 @@
         </div>
         <div class="upload-title">Drop your file here, or click to browse</div>
         <div class="upload-sub">CSV, Excel (.xlsx / .xls), or plain text (.txt)</div>
-        <div class="upload-hint">One place per row. For CSV/Excel, pick which column after uploading.</div>
+        <div class="upload-hint">One place per row. For Excel files with multiple sheets, choose which sheets and columns to include.</div>
       </div>
       <div class="file-preview" id="file-preview">
         <div class="file-icon" id="file-icon">CSV</div>
@@ -334,10 +345,10 @@
         </div>
         <button class="file-clear" id="file-clear">Clear</button>
       </div>
-      <div class="col-picker" id="col-picker">
-        <div class="col-picker-label">Which column contains the place names?</div>
-        <select id="col-select"></select>
-        <div class="col-preview-text" id="col-preview"></div>
+      <div class="sheet-picker" id="sheet-picker">
+        <div class="sheet-picker-label">Select sheets &amp; columns to include</div>
+        <div class="sheet-list" id="sheet-list"></div>
+        <div class="sheet-total" id="sheet-total"></div>
       </div>
       <button class="batch-run-btn" id="btn-batch">Generate facts for all places</button>
       <div class="progress-wrap" id="progress-wrap">
@@ -403,9 +414,8 @@ let SESSION_KEY = '';
 let singleFacts = [];
 let pickedSingle = null;
 let batchResults = [];
-let parsedRows = [];
-let headers = [];
-let activeCol = 0;
+// Multi-sheet state: array of {sheetName, headers, rows, selectedCol, enabled}
+let sheetData = [];
 
 // ── Boot ─────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -443,7 +453,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-batch').addEventListener('click', generateBatch);
   document.getElementById('export-batch-btn').addEventListener('click', exportBatchCSV);
   document.getElementById('file-clear').addEventListener('click', clearFile);
-  document.getElementById('col-select').addEventListener('change', previewColumn);
   document.getElementById('db-search').addEventListener('input', renderHistory);
   document.getElementById('db-export-btn').addEventListener('click', exportHistoryCSV);
   document.getElementById('db-clear-btn').addEventListener('click', clearHistory);
@@ -853,11 +862,12 @@ async function generateSingle() {
 
 // ── File upload ───────────────────────────────────────────────────────────
 function clearFile() {
-  parsedRows = []; headers = [];
+  sheetData = [];
   document.getElementById('file-preview').classList.remove('visible');
-  document.getElementById('col-picker').classList.remove('visible');
+  document.getElementById('sheet-picker').classList.remove('visible');
   document.getElementById('file-input').value = '';
-  document.getElementById('col-preview').textContent = '';
+  document.getElementById('sheet-list').innerHTML = '';
+  document.getElementById('sheet-total').textContent = '';
   document.getElementById('results-batch').innerHTML = '';
   document.getElementById('export-bar').classList.remove('visible');
   document.getElementById('progress-wrap').classList.remove('visible');
@@ -874,64 +884,133 @@ function processFile(file) {
   document.getElementById('file-preview').classList.add('visible');
 
   const reader = new FileReader();
+
   if (ext === 'csv' || ext === 'txt') {
     reader.onload = e => {
       const lines = e.target.result.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
       if (!lines.length) { alert('File appears empty.'); return; }
       const cols = lines[0].split(',').map(c => c.replace(/^"|"$/g, '').trim());
+      let headers, rows;
       if (cols.length > 1) {
         headers = cols;
-        parsedRows = lines.slice(1).map(l => l.split(',').map(c => c.replace(/^"|"$/g, '').trim()));
-        showColPicker();
+        rows = lines.slice(1).map(l => l.split(',').map(c => c.replace(/^"|"$/g, '').trim()));
       } else {
-        headers = ['Place']; parsedRows = lines.map(l => [l]);
-        hideColPicker(); activeCol = 0;
+        headers = ['Place'];
+        rows = lines.map(l => [l]);
       }
-      document.getElementById('file-meta').textContent = `${parsedRows.length} rows detected`;
+      sheetData = [{ sheetName: file.name, headers, rows, selectedCol: 0, enabled: true }];
+      document.getElementById('file-meta').textContent = `${rows.length} rows detected`;
+      renderSheetPicker();
     };
     reader.readAsText(file);
+
   } else if (ext === 'xlsx' || ext === 'xls') {
     reader.onload = e => {
       const wb = XLSX.read(e.target.result, { type: 'array' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-      if (data.length < 2) { alert('Spreadsheet appears empty.'); return; }
-      headers = data[0].map(String);
-      parsedRows = data.slice(1).filter(r => r.some(c => String(c).trim()));
-      document.getElementById('file-meta').textContent = `${parsedRows.length} rows detected`;
-      showColPicker();
+      sheetData = [];
+      wb.SheetNames.forEach(name => {
+        const ws = wb.Sheets[name];
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        if (data.length < 2) return; // skip empty sheets
+        const headers = data[0].map(String);
+        const rows = data.slice(1).filter(r => r.some(c => String(c).trim()));
+        if (rows.length) sheetData.push({ sheetName: name, headers, rows, selectedCol: 0, enabled: true });
+      });
+      if (!sheetData.length) { alert('No usable sheets found in this file.'); return; }
+      const totalRows = sheetData.reduce((s, d) => s + d.rows.length, 0);
+      document.getElementById('file-meta').textContent = `${sheetData.length} sheet${sheetData.length > 1 ? 's' : ''}, ${totalRows} rows total`;
+      renderSheetPicker();
     };
     reader.readAsArrayBuffer(file);
+
   } else {
     alert('Unsupported file type. Please use CSV, XLSX, XLS, or TXT.');
   }
 }
 
-function showColPicker() {
-  const sel = document.getElementById('col-select');
-  sel.innerHTML = headers.map((h, i) => `<option value="${i}">${esc(h) || 'Column ' + (i + 1)}</option>`).join('');
-  document.getElementById('col-picker').classList.add('visible');
-  previewColumn();
+function renderSheetPicker() {
+  const picker = document.getElementById('sheet-picker');
+  const list = document.getElementById('sheet-list');
+  picker.classList.add('visible');
+  list.innerHTML = '';
+
+  sheetData.forEach((sheet, si) => {
+    const row = document.createElement('div');
+    row.className = 'sheet-row expanded';
+    row.id = `sheet-row-${si}`;
+
+    const colOptions = sheet.headers.map((h, ci) =>
+      `<option value="${ci}">${esc(h) || 'Column ' + (ci + 1)}</option>`
+    ).join('');
+
+    const samples = sheet.rows.slice(0, 3).map(r => String(r[sheet.selectedCol] || '').trim()).filter(Boolean);
+    const preview = samples.length ? 'e.g. ' + samples.join(', ') + (sheet.rows.length > 3 ? '…' : '') : 'No values';
+
+    row.innerHTML = `
+      <div class="sheet-row-top">
+        <input type="checkbox" class="sheet-checkbox" id="sheet-cb-${si}" ${sheet.enabled ? 'checked' : ''} data-sheet-index="${si}" />
+        <label class="sheet-name" for="sheet-cb-${si}">${esc(sheet.sheetName)}</label>
+        <span class="sheet-row-count">${sheet.rows.length} rows</span>
+      </div>
+      <div class="sheet-col-wrap">
+        <div class="sheet-col-label">Which column contains the place names?</div>
+        <select class="sheet-col-select" id="sheet-col-${si}" data-sheet-index="${si}">
+          ${colOptions}
+        </select>
+        <div class="sheet-col-preview" id="sheet-preview-${si}">${esc(preview)}</div>
+      </div>`;
+    list.appendChild(row);
+
+    // Checkbox toggle
+    row.querySelector('.sheet-checkbox').addEventListener('change', function() {
+      sheetData[si].enabled = this.checked;
+      row.classList.toggle('expanded', this.checked);
+      updateSheetTotal();
+    });
+
+    // Column select change
+    row.querySelector('.sheet-col-select').addEventListener('change', function() {
+      sheetData[si].selectedCol = parseInt(this.value);
+      const s = sheetData[si].rows.slice(0, 3).map(r => String(r[sheetData[si].selectedCol] || '').trim()).filter(Boolean);
+      document.getElementById(`sheet-preview-${si}`).textContent = s.length ? 'e.g. ' + s.join(', ') + (sheetData[si].rows.length > 3 ? '…' : '') : 'No values';
+      updateSheetTotal();
+    });
+  });
+
+  updateSheetTotal();
 }
 
-function hideColPicker() { document.getElementById('col-picker').classList.remove('visible'); }
-
-function previewColumn() {
-  activeCol = parseInt(document.getElementById('col-select').value);
-  const samples = parsedRows.slice(0, 4).map(r => String(r[activeCol] || '').trim()).filter(Boolean);
-  document.getElementById('col-preview').textContent = samples.length
-    ? 'Preview: ' + samples.join(' · ') + (parsedRows.length > 4 ? ' …' : '') : 'No values found';
+function updateSheetTotal() {
+  const enabled = sheetData.filter(s => s.enabled);
+  const total = enabled.reduce((sum, s) => {
+    return sum + s.rows.map(r => String(r[s.selectedCol] || '').trim()).filter(Boolean).length;
+  }, 0);
+  const el = document.getElementById('sheet-total');
+  if (sheetData.length > 1) {
+    el.textContent = `${enabled.length} of ${sheetData.length} sheets selected — ${total} places total`;
+  } else {
+    el.textContent = `${total} places to generate facts for`;
+  }
 }
 
 // ── Batch generate ────────────────────────────────────────────────────────
 async function generateBatch() {
-  if (!parsedRows.length) { alert('Please upload a file first.'); return; }
-  const places = parsedRows.map(r => String(r[activeCol] || '').trim()).filter(Boolean);
-  if (!places.length) { alert('No place names found in the selected column.'); return; }
+  if (!sheetData.length) { alert('Please upload a file first.'); return; }
+
+  // Collect all places from all enabled sheets
+  const allPlaces = [];
+  sheetData.filter(s => s.enabled).forEach(sheet => {
+    sheet.rows.forEach(r => {
+      const val = String(r[sheet.selectedCol] || '').trim();
+      if (val) allPlaces.push({ place: val, sheet: sheet.sheetName });
+    });
+  });
+
+  if (!allPlaces.length) { alert('No place names found in the selected sheets/columns.'); return; }
 
   const btn = document.getElementById('btn-batch');
   btn.disabled = true; btn.textContent = 'Generating…';
-  batchResults = places.map(p => ({ place: p, facts: null, selected: null, error: null }));
+  batchResults = allPlaces.map(p => ({ place: p.place, sheet: p.sheet, facts: null, selected: null, error: null }));
 
   const pw = document.getElementById('progress-wrap');
   const pb = document.getElementById('progress-bar');
@@ -942,11 +1021,24 @@ async function generateBatch() {
   container.innerHTML = '';
   document.getElementById('export-bar').classList.remove('visible');
 
-  for (let i = 0; i < places.length; i++) {
-    const place = places[i];
+  // Group results by sheet visually if more than one sheet
+  const multiSheet = sheetData.filter(s => s.enabled).length > 1;
+  let currentSheet = null;
+
+  for (let i = 0; i < allPlaces.length; i++) {
+    const { place, sheet } = allPlaces[i];
     pl.textContent = `Generating facts for ${place}…`;
-    pc.textContent = `${i} / ${places.length}`;
-    pb.style.width = `${(i / places.length) * 100}%`;
+    pc.textContent = `${i} / ${allPlaces.length}`;
+    pb.style.width = `${(i / allPlaces.length) * 100}%`;
+
+    // Add sheet heading when it changes (multi-sheet mode)
+    if (multiSheet && sheet !== currentSheet) {
+      currentSheet = sheet;
+      const heading = document.createElement('div');
+      heading.style.cssText = 'font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#aaa;padding:1rem 0 0.5rem;border-top:1px solid #eee;margin-top:0.5rem';
+      heading.textContent = sheet;
+      container.appendChild(heading);
+    }
 
     const group = document.createElement('div');
     group.className = 'place-group'; group.id = `group-${i}`;
@@ -976,11 +1068,11 @@ async function generateBatch() {
       errDiv.textContent = `Error: ${e.message}`;
       group.querySelector('.loading').replaceWith(errDiv);
     }
-    if (i < places.length - 1) await sleep(400);
+    if (i < allPlaces.length - 1) await sleep(400);
   }
 
   pl.textContent = 'All done!';
-  pc.textContent = `${places.length} / ${places.length}`;
+  pc.textContent = `${allPlaces.length} / ${allPlaces.length}`;
   pb.style.width = '100%';
   btn.disabled = false; btn.textContent = 'Generate facts for all places';
   document.getElementById('export-bar').classList.add('visible');
@@ -988,8 +1080,8 @@ async function generateBatch() {
 }
 
 function exportBatchCSV() {
-  const rows = [['Place', 'Selected fact', 'Fact 1 (historical)', 'Fact 2 (geographical)', 'Fact 3 (cultural)']];
-  batchResults.forEach(r => { if (r.facts) rows.push([r.place, r.selected || '', ...r.facts]); });
+  const rows = [['Place', 'Sheet', 'Selected fact', 'Fact 1 (historical)', 'Fact 2 (geographical)', 'Fact 3 (cultural)']];
+  batchResults.forEach(r => { if (r.facts) rows.push([r.place, r.sheet || '', r.selected || '', ...r.facts]); });
   downloadCSV(rows, 'facts-batch-export.csv');
 }
 
