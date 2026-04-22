@@ -405,7 +405,7 @@
 // ── Constants ────────────────────────────────────────────────────────────────
 const DB_KEY = 'factgen_history';
 const STORED_KEY = 'factgen_apikey';
-const MAX_RETRIES = 3;
+const MAX_RETRIES = 4;
 const ICON_BG    = ['#e8f0fe', '#e8f4e8', '#fef3e2'];
 const ICON_COLOR = ['#1557c0', '#1a6b3a', '#b06000'];
 const ICON_LETTER = ['W', 'O', 'N'];
@@ -591,7 +591,7 @@ async function callClaude(prompt, maxTokens=800) {
 // ── Step 1: Generate candidate description ───────────────────────────────────
 async function generateCandidateFact(place, lastError = '') {
   const retryHint = lastError
-    ? `\n\nIMPORTANT: your previous attempt failed with this error: "${lastError}"\nAvoid the same issue. If the error mentions an em dash, rewrite the sentence entirely without using that character anywhere. If the error mentions a specific detail being unverifiable, choose a COMPLETELY DIFFERENT surprising detail about this place. If the error gives a corrected version, use that as your basis. If the error mentions length, adjust accordingly.`
+    ? `\n\nIMPORTANT: your previous attempt failed with this error: "${lastError}"\nYou must avoid the same issue. Rules:\n- If the error mentions an em dash, rewrite entirely without using that character.\n- If the error mentions a specific claim being incorrect or unverifiable, you must choose a COMPLETELY DIFFERENT fact about this place. Do not rephrase or slightly adjust the same claim. Pick a different subject entirely.\n- If the same type of claim (e.g. a delivery tradition, a construction statistic, an island count) has already failed, do not try a variation of it. Move to a different category of fact.\n- If the error gives a corrected version, you may use that as the basis for your rewrite.\n- If the error mentions length, adjust accordingly.`
     : '';
 
   const raw = await callClaude(`You are a writer creating stamp descriptions for a passport collectible app. Each description covers a real place and follows a strict two-part hybrid format:
@@ -630,6 +630,8 @@ BANNED CLOSING PHRASES (never use these or anything like them):
 
 The closing phrase must answer: "what does it feel like to stand here, knowing this?" not "how does this compare to something else?"
 
+CLOSING CLAUSE ACCURACY: The closing phrase must be as factually grounded as Part 1. Do not invent claims in the closing that were not established in Part 1. "where no one has ever built a home" or "that no map had ever recorded" are examples of invented closing claims that sound evocative but are false. If you cannot verify the closing claim, use a sensory or observational statement instead ("where the Atlantic horizon fills every window", "where the original stonework is still underfoot").
+
 BANNED FACT CATEGORIES (never use facts from these areas):
 - Politics, elections, voting systems or political parties
 - Laws, legislation, legal rulings or criminal justice policy
@@ -637,6 +639,7 @@ BANNED FACT CATEGORIES (never use facts from these areas):
 - Military spending, defence policy or treaties
 - Economic policy, tax systems or trade agreements
 - Immigration or citizenship rules
+- Death, human remains, burials, cemeteries, executions, disasters or tragedies. The tone must make someone want to visit, not feel unsettled. If a place has a famous dark history, choose a different angle entirely.
 
 PREFERRED FACT CATEGORIES (always draw from these):
 - Geography: size, position, borders, terrain, coastline, elevation, rivers, islands
@@ -719,13 +722,12 @@ Respond ONLY with valid JSON, no markdown:
     iconLetter: ICON_LETTER[j] || '?'
   }));
 
-  // Second pass: verify only the factual kernel, not the evocative closing
-  const verifyRaw = await callClaude(`You are a fact-checker. Assess this specific verifiable claim:
+  // Second pass: verify the factual kernel AND check the closing clause for invented claims
+  const verifyRaw = await callClaude(`You are a fact-checker. You have two jobs:
 
+JOB 1: Assess this specific verifiable claim extracted from a stamp description:
 Claim: "${parsed.key_claim}"
 Context (place): "${place}"
-
-NOTE: This claim was extracted from a stamp description. You are checking the factual kernel only, not any evocative or atmospheric language around it.
 
 Classify into one of three categories:
 1. CORRECT: factually accurate and well-documented in multiple reliable sources
@@ -734,13 +736,18 @@ Classify into one of three categories:
 
 CRITICAL rule on numbers: if the claim contains a specific quantity (e.g. "30,000 pounds", "80 percent", "2 million visitors") and that exact figure is not confirmed in multiple reliable sources, classify as WRONG, not AMBIGUOUS. An unverifiable specific number is not a minor imprecision, it is a fabricated statistic.
 
+JOB 2: Check the full description for invented closing claims.
+Full description: "${fact}"
+
+Look at the closing phrase (the second half of the sentence after the main fact). Flag it as CLOSING_INVENTED if it makes a factual claim that is not established in the first half and cannot be independently verified. Examples of invented closing claims: "where no one has ever built a home", "that no map had ever recorded", "mailing thousands of care packages each year". Sensory or observational closings are fine: "where the original stonework is still underfoot", "where the Atlantic horizon fills every window".
+
 Rules:
 - AMBIGUOUS is only for genuine minor date or phrasing uncertainty, not for unconfirmed quantities
 - Use WRONG for any specific figure that appears estimated, approximate or unverifiable
-- If WRONG, provide the corrected version in the correction field. If the number is the problem, suggest a version of the claim without the unverifiable figure.
+- If WRONG or CLOSING_INVENTED, provide the corrected version in the correction field.
 
 Respond ONLY with valid JSON, no markdown:
-{"status": "CORRECT|AMBIGUOUS|WRONG", "note": "brief explanation", "correction": "corrected claim or empty string"}`, 400);
+{"status": "CORRECT|AMBIGUOUS|WRONG", "closing_ok": true, "note": "brief explanation", "correction": "corrected claim or empty string"}`, 500);
 
   const verifyResult = JSON.parse(verifyRaw);
 
@@ -748,6 +755,13 @@ Respond ONLY with valid JSON, no markdown:
     const correction = verifyResult.correction ? ` Corrected version: "${verifyResult.correction}"` : '';
     const err = new Error(`Factual claim is incorrect: ${verifyResult.note}${correction}`);
     err.rejectionType = 'factual_error';
+    throw err;
+  }
+
+  if (verifyResult.closing_ok === false) {
+    const correction = verifyResult.correction ? ` Suggested fix: "${verifyResult.correction}"` : '';
+    const err = new Error(`Closing clause contains an invented claim: ${verifyResult.note}${correction}`);
+    err.rejectionType = 'invented_closing';
     throw err;
   }
 
