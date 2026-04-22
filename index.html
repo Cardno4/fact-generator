@@ -535,10 +535,10 @@ function signOut() {
 // ── DB ────────────────────────────────────────────────────────────────────────
 function dbLoad() { try { return JSON.parse(localStorage.getItem(DB_KEY)||'[]'); } catch(e) { return []; } }
 function dbSave(r) { localStorage.setItem(DB_KEY, JSON.stringify(r)); updateBadge(); }
-function dbAddEntry(place, fact, sources, sessionId) {
+function dbAddEntry(place, fact, sources, sessionId, country) {
   const records = dbLoad();
   const existing = records.findIndex(r => r.place.toLowerCase() === place.toLowerCase() && r.sessionId === sessionId);
-  const entry = { id: existing>=0 ? records[existing].id : Date.now()+Math.random(), place, fact, sources, sessionId: sessionId||'', date: new Date().toISOString() };
+  const entry = { id: existing>=0 ? records[existing].id : Date.now()+Math.random(), place, fact, sources, country: country||'', sessionId: sessionId||'', date: new Date().toISOString() };
   if (existing>=0) records[existing] = entry; else records.unshift(entry);
   dbSave(records);
 }
@@ -606,12 +606,12 @@ Rules (strict):
 - Do NOT start the sentence with "${place}" — vary the opening${retryHint}
 
 Respond ONLY with valid JSON, no markdown:
-{"fact":"the historical fact here"}`);
+{"fact":"the historical fact here","country":"Full country name, e.g. United States of America"}`);
   const parsed = JSON.parse(raw);
   if (!parsed.fact || parsed.fact.length < 140 || parsed.fact.length > 260) {
     throw new Error(`Fact length out of range: ${parsed.fact?.length} chars — target 140–260`);
   }
-  return parsed.fact;
+  return { fact: parsed.fact, country: parsed.country || '' };
 }
 
 // ── Step 2: Auto-verify against Wikipedia + second source ────────────────────
@@ -699,13 +699,13 @@ async function generateAndVerify(place, onStatusUpdate) {
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       onStatusUpdate(`Generating historical fact (attempt ${attempt}/${MAX_RETRIES})${attempt > 1 ? ' — retrying with different approach…' : ''}`, attempt);
-      const fact = await generateCandidateFact(place, lastError);
+      const { fact, country } = await generateCandidateFact(place, lastError);
 
       onStatusUpdate(`Verifying against Wikipedia and encyclopaedia sources…`, attempt);
       const verifyData = await autoVerifyFact(place, fact);
 
       // Passed (CORRECT or AMBIGUOUS) — return everything
-      return { fact, ...verifyData };
+      return { fact, country, ...verifyData };
     } catch(e) {
       lastError = e.message;
       // Don't bother retrying a genuine factual error with the same place — 
@@ -839,7 +839,7 @@ async function generateSingle() {
     });
 
     renderFactCard(results, q, result, 's');
-    dbAddEntry(q, result.fact, result.sources, CURRENT_SESSION_ID);
+    dbAddEntry(q, result.fact, result.sources, CURRENT_SESSION_ID, result.country);
 
   } catch(e) {
     results.innerHTML = `<div class="error-msg">
@@ -987,7 +987,7 @@ async function generateBatch() {
 
   const btn = document.getElementById('btn-batch');
   btn.disabled = true; btn.textContent = 'Generating…';
-  batchResults = allPlaces.map(p=>({ place: p.place, sheet: p.sheet, row: p.row, headers: p.headers, selectedCol: p.selectedCol, fact: null, sources: null, error: null }));
+  batchResults = allPlaces.map(p=>({ place: p.place, sheet: p.sheet, row: p.row, headers: p.headers, selectedCol: p.selectedCol, fact: null, country: '', sources: null, error: null }));
 
   const pw=document.getElementById('progress-wrap'), pb=document.getElementById('progress-bar');
   const pl=document.getElementById('progress-label'), pc=document.getElementById('progress-count');
@@ -1032,12 +1032,13 @@ async function generateBatch() {
       });
 
       batchResults[i].fact = result.fact;
+      batchResults[i].country = result.country;
       batchResults[i].sources = result.sources;
 
       const factDiv = document.createElement('div');
       renderFactCard(factDiv, place, result, `b${i}`);
       group.querySelector(`#group-loading-${i}`).replaceWith(factDiv.firstChild);
-      dbAddEntry(place, result.fact, result.sources, CURRENT_SESSION_ID);
+      dbAddEntry(place, result.fact, result.sources, CURRENT_SESSION_ID, result.country);
 
     } catch(e) {
       batchResults[i].error = e.message;
@@ -1079,6 +1080,7 @@ function exportBatchCSV() {
   // Build header row: original extra columns first, then our generated columns
   const headerRow = [
     'Place',
+    'Country',
     'Sheet',
     ...seenHeaders,
     'Verified Historical Fact',
@@ -1096,9 +1098,9 @@ function exportBatchCSV() {
     const extras = seenHeaders.map(h => extraColsByResult[i][h] || '');
     if (r.fact) {
       const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
-      rows.push([r.place, r.sheet||'', ...extras, r.fact, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
+      rows.push([r.place, r.country||'', r.sheet||'', ...extras, r.fact, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
     } else {
-      rows.push([r.place, r.sheet||'', ...extras, '', '', 'Failed', r.error||'Could not produce a verified fact after 3 attempts', '', '', '']);
+      rows.push([r.place, r.country||'', r.sheet||'', ...extras, '', '', 'Failed', r.error||'Could not produce a verified fact after 3 attempts', '', '', '']);
     }
   });
 
@@ -1221,10 +1223,10 @@ function clearHistory() {
 function exportSessionCSV(sessionId, sessionDate) {
   const records = dbLoad().filter(r => (r.sessionId || 'legacy') === sessionId);
   if (!records.length) { alert('No entries found for this session.'); return; }
-  const rows = [['Place', 'Date', 'Verified Historical Fact', 'Char Count', 'Status', 'Source 1', 'Source 2', 'Source 3']];
+  const rows = [['Place', 'Country', 'Date', 'Verified Historical Fact', 'Char Count', 'Status', 'Source 1', 'Source 2', 'Source 3']];
   records.forEach(r => {
     const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
-    rows.push([r.place, fmtDate(r.date), r.fact||'', (r.fact||'').length, r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
+    rows.push([r.place, r.country||'', fmtDate(r.date), r.fact||'', (r.fact||'').length, r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
   });
   // Label filename with session datetime
   const dateSlug = sessionDate ? new Date(sessionDate).toISOString().replace(/[:.]/g,'-').substring(0,19) : 'session';
@@ -1234,11 +1236,11 @@ function exportSessionCSV(sessionId, sessionDate) {
 function exportHistoryCSV() {
   const records = dbLoad();
   if (!records.length) { alert('No history to export.'); return; }
-  const rows = [['Place', 'Session', 'Date', 'Verified Historical Fact', 'Char Count', 'Status', 'Source 1', 'Source 2', 'Source 3']];
+  const rows = [['Place', 'Country', 'Session', 'Date', 'Verified Historical Fact', 'Char Count', 'Status', 'Source 1', 'Source 2', 'Source 3']];
   records.forEach(r => {
     const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
     const sessionLabel = r.sessionId ? fmtDate(new Date(parseInt(r.sessionId.replace('session_',''))).toISOString()) : 'Legacy';
-    rows.push([r.place, sessionLabel, fmtDate(r.date), r.fact||'', (r.fact||'').length, r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
+    rows.push([r.place, r.country||'', sessionLabel, fmtDate(r.date), r.fact||'', (r.fact||'').length, r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
   });
   downloadCSV(rows, 'facts-history-all.csv');
 }
