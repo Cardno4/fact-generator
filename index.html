@@ -377,10 +377,10 @@
       </div>
       <div id="results-batch"></div>
       <div class="export-bar" id="export-bar">
-        <span class="export-text">All done — export facts as CSV</span>
+        <span class="export-text" id="export-bar-text">All done — export facts as Excel</span>
         <button class="export-btn" id="export-batch-btn">
           <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2v9M4 8l4 4 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 13h12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-          Export as CSV
+          Export as Excel (.xlsx)
         </button>
       </div>
     </div>
@@ -442,7 +442,7 @@ document.addEventListener('DOMContentLoaded', () => {
     t.addEventListener('click', () => { document.getElementById('q').value = t.dataset.fill; });
   });
   document.getElementById('btn-batch').addEventListener('click', generateBatch);
-  document.getElementById('export-batch-btn').addEventListener('click', exportBatchCSV);
+  document.getElementById('export-batch-btn').addEventListener('click', exportBatchXLSX);
   document.getElementById('file-clear').addEventListener('click', clearFile);
   document.getElementById('db-search').addEventListener('input', renderHistory);
   document.getElementById('db-export-btn').addEventListener('click', exportHistoryCSV);
@@ -1072,57 +1072,96 @@ async function generateBatch() {
   pc.textContent = `${allPlaces.length} / ${allPlaces.length}`;
   pb.style.width = '100%';
   btn.disabled = false; btn.textContent = 'Generate verified facts for all places';
+  const uniqueSheets = [...new Set(batchResults.map(r => r.sheet).filter(Boolean))];
+  const exportLabel = uniqueSheets.length > 1
+    ? `All done — ${uniqueSheets.length} tabs ready to export as Excel`
+    : 'All done — export facts as Excel';
+  document.getElementById('export-bar-text').textContent = exportLabel;
   document.getElementById('export-bar').classList.add('visible');
   updateBadge();
 }
 
-function exportBatchCSV() {
+function exportBatchXLSX() {
   if (!batchResults.length) return;
 
-  // Collect all unique original headers across all sheets in order of appearance,
-  // excluding the place-name column itself (we already have it as 'Place')
-  const seenHeaders = [];
-  const extraColsByResult = batchResults.map(r => {
-    const extras = {};
-    if (r.headers && r.row) {
-      r.headers.forEach((h, ci) => {
-        if (ci === r.selectedCol) return; // skip the place column — already included
-        const label = h || `Column ${ci + 1}`;
-        if (!seenHeaders.includes(label)) seenHeaders.push(label);
-        extras[label] = String(r.row[ci] || '');
-      });
-    }
-    return extras;
+  const wb = XLSX.utils.book_new();
+
+  // Group results by their source sheet name, preserving insertion order
+  const sheetGroups = new Map(); // sheetName -> [result, ...]
+  batchResults.forEach(r => {
+    const name = r.sheet || 'Sheet1';
+    if (!sheetGroups.has(name)) sheetGroups.set(name, []);
+    sheetGroups.get(name).push(r);
   });
 
-  // Build header row: original extra columns first, then our generated columns
-  const headerRow = [
-    'Place',
-    'Country',
-    'Sheet',
-    ...seenHeaders,
-    'Verified Historical Fact',
-    'Char Count',
-    'Status',
-    'Failure Reason',
-    'Source 1',
-    'Source 2',
-    'Source 3'
-  ];
+  sheetGroups.forEach((results, sheetName) => {
+    // Collect extra original columns for this sheet's results only
+    const seenHeaders = [];
+    const extraColsByResult = results.map(r => {
+      const extras = {};
+      if (r.headers && r.row) {
+        r.headers.forEach((h, ci) => {
+          if (ci === r.selectedCol) return;
+          const label = h || `Column ${ci + 1}`;
+          if (!seenHeaders.includes(label)) seenHeaders.push(label);
+          extras[label] = String(r.row[ci] || '');
+        });
+      }
+      return extras;
+    });
 
-  const rows = [headerRow];
+    // Header row — original extra cols first, then generated cols
+    const headerRow = [
+      'Place',
+      'Country',
+      ...seenHeaders,
+      'Verified Historical Fact',
+      'Char Count',
+      'Status',
+      'Failure Reason',
+      'Source 1',
+      'Source 2',
+      'Source 3'
+    ];
 
-  batchResults.forEach((r, i) => {
-    const extras = seenHeaders.map(h => extraColsByResult[i][h] || '');
-    if (r.fact) {
-      const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
-      rows.push([r.place, r.country||'', r.sheet||'', ...extras, r.fact, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
-    } else {
-      rows.push([r.place, r.country||'', r.sheet||'', ...extras, '', '', 'Failed', r.error||'Could not produce a verified fact after 3 attempts', '', '', '']);
-    }
+    const rows = [headerRow];
+    results.forEach((r, i) => {
+      const extras = seenHeaders.map(h => extraColsByResult[i][h] || '');
+      if (r.fact) {
+        const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
+        rows.push([r.place, r.country||'', ...extras, r.fact, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
+      } else {
+        rows.push([r.place, r.country||'', ...extras, '', '', 'Failed', r.error||'Could not produce a verified fact after 3 attempts', '', '', '']);
+      }
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+
+    // Set column widths for readability
+    ws['!cols'] = [
+      { wch: 30 },  // Place
+      { wch: 24 },  // Country
+      ...seenHeaders.map(() => ({ wch: 20 })),
+      { wch: 70 },  // Verified Historical Fact
+      { wch: 10 },  // Char Count
+      { wch: 10 },  // Status
+      { wch: 40 },  // Failure Reason
+      { wch: 50 },  // Source 1
+      { wch: 50 },  // Source 2
+      { wch: 50 },  // Source 3
+    ];
+
+    // Sanitise sheet name — Excel limits to 31 chars, no special chars
+    const safeName = sheetName.replace(/[:\\\/\?\*\[\]]/g, '').substring(0, 31);
+    XLSX.utils.book_append_sheet(wb, ws, safeName);
   });
 
-  downloadCSV(rows, 'facts-export.csv');
+  // Write and trigger download
+  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([wbout], { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'facts-export.xlsx'; a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ── History ────────────────────────────────────────────────────────────────────
