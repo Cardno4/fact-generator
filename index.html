@@ -626,6 +626,12 @@ INSTEAD, always draw from these categories:
 - Cultural output: language reach, UNESCO sites, ancient civilisations, historic firsts
 - Physical records: oldest, largest, deepest, highest, longest — specific and measurable
 
+RULES FOR NUMBERS AND QUANTITIES — critical:
+- Only include a specific number, measurement or quantity if it is well-documented enough to appear in multiple encyclopaedia-level sources
+- If you are not certain a specific number is confirmed, describe the fact WITHOUT the number rather than inventing or estimating one
+- "over 30,000 pounds" or "more than 2 million visitors" are the kind of figures that get fabricated — do not use any quantity you cannot be certain of
+- Saying "one of the longest" or "built in under a year" is fine; inventing a precise figure is not
+
 BANNED closing phrases — never use these or anything like them:
 - "...and it has defined the skyline ever since"
 - "...a place unlike any other"
@@ -707,14 +713,16 @@ Context (place): "${place}"
 NOTE: This claim was extracted from a stamp description. You are checking the factual kernel only — not any evocative or atmospheric language around it.
 
 Classify into one of three categories:
-1. CORRECT — factually accurate and well-documented
-2. AMBIGUOUS — core substance is correct but a minor detail (exact day, year varying by 1–2 across sources, slight imprecision) is uncertain. Not wrong, just imprecise.
-3. WRONG — contains a clear factual error (wrong figure, wrong person, event that didn't happen, wrong order of magnitude, etc.)
+1. CORRECT — factually accurate and well-documented in multiple reliable sources
+2. AMBIGUOUS — the core event or detail is real and documented, but a minor surrounding detail (e.g. exact day of month, year varying by 1–2 across sources) is uncertain. The substance is not wrong, just slightly imprecise.
+3. WRONG — contains a clear factual error, OR includes a specific number/quantity/measurement that cannot be independently confirmed in encyclopaedia-level sources
+
+CRITICAL rule on numbers: if the claim contains a specific quantity (e.g. "30,000 pounds", "80 percent", "2 million visitors") and that exact figure is not confirmed in multiple reliable sources, classify as WRONG — not AMBIGUOUS. An unverifiable specific number is not a minor imprecision, it is a fabricated statistic.
 
 Rules:
-- Do NOT mark WRONG for minor date ambiguity — use AMBIGUOUS
-- Only use WRONG for errors that would genuinely mislead someone about the place
-- If WRONG, provide the corrected version in the "correction" field
+- AMBIGUOUS is only for genuine minor date or phrasing uncertainty — not for unconfirmed quantities
+- Use WRONG for any specific figure that appears estimated, approximate or unverifiable
+- If WRONG, provide the corrected version in the "correction" field — if the number is the problem, suggest a version of the claim without the unverifiable figure
 
 Respond ONLY with valid JSON, no markdown:
 {"status": "CORRECT|AMBIGUOUS|WRONG", "note": "brief explanation", "correction": "corrected claim or empty string"}`, 400);
