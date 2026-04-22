@@ -228,6 +228,13 @@
     .db-fact-copy:hover { background: #f5f5f5; }
     .db-item-delete { font-size: 11px; color: #ccc; cursor: pointer; margin-top: 8px; display: inline-block; padding: 3px 8px; border: 1px solid #eee; border-radius: 6px; }
     .db-item-delete:hover { color: #c00; border-color: #fcc; background: #fff5f5; }
+    .db-verify-btn { font-size: 11px; padding: 3px 10px; border: 1px solid #e0e0e0; border-radius: 6px; background: transparent; cursor: pointer; color: #555; display: inline-flex; align-items: center; gap: 4px; }
+    .db-verify-btn:hover { background: #f5f5f5; border-color: #bbb; }
+    .db-actions { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    .db-history-sources { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0f0f0; }
+    .db-history-sources.open { display: block; }
+    .db-history-sources .sources-heading { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #aaa; margin-bottom: 10px; }
+    .db-history-sources .sources-note { font-size: 11px; color: #bbb; margin-top: 10px; line-height: 1.55; }
 
     /* States */
     .empty { text-align: center; padding: 3rem 0; color: #bbb; font-size: 14px; }
@@ -761,6 +768,16 @@ function handleCardClick(e) {
   if (action === 'db-toggle') {
     document.getElementById('db-'+btn.dataset.id).classList.toggle('open');
   }
+
+  if (action === 'db-toggle-sources') {
+    const id = btn.dataset.id;
+    const panel = document.getElementById(`db-sources-${id}`);
+    if (!panel) return;
+    const isOpen = panel.classList.toggle('open');
+    btn.innerHTML = isOpen
+      ? `<svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.3"/><path d="M5 8.5l2 2 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg> Hide sources`
+      : `<svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.3"/><path d="M5 8.5l2 2 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg> View sources`;
+  }
 }
 
 // ── Single generate ───────────────────────────────────────────────────────────
@@ -996,11 +1013,14 @@ async function generateBatch() {
 }
 
 function exportBatchCSV() {
-  const rows = [['Place', 'Sheet', 'Verified Historical Fact', 'Char Count', 'Source 1', 'Source 2', 'Source 3']];
+  const rows = [['Place', 'Sheet', 'Verified Historical Fact', 'Char Count', 'Status', 'Failure Reason', 'Source 1', 'Source 2', 'Source 3']];
   batchResults.forEach(r => {
-    if (!r.fact) return;
-    const srcs = (r.sources||[]).map(s=>s.label+': '+s.url);
-    rows.push([r.place, r.sheet||'', r.fact, r.fact.length, srcs[0]||'', srcs[1]||'', srcs[2]||'']);
+    if (r.fact) {
+      const srcs = (r.sources||[]).map(s=>s.label+': '+s.url);
+      rows.push([r.place, r.sheet||'', r.fact, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
+    } else {
+      rows.push([r.place, r.sheet||'', '', '', 'Failed', r.error||'Could not produce a verified fact after 3 attempts', '', '', '']);
+    }
   });
   downloadCSV(rows, 'facts-export.csv');
 }
@@ -1022,9 +1042,39 @@ function renderHistory() {
     const item = document.createElement('div');
     item.className = 'db-item'; item.id = `db-${r.id}`;
 
-    const sourcesHtml = (r.sources||[]).map(s =>
-      `<a href="${esc(s.url)}" target="_blank" rel="noopener" style="color:#1557c0;text-decoration:none">${esc(s.label)}</a>`
-    ).join(' · ');
+    // Build the inline sources panel from stored source objects
+    const sources = r.sources || [];
+    const hasSources = sources.length > 0;
+
+    const sourceLinksHtml = sources.map((s, j) => {
+      const bg    = ICON_BG[j]     || '#f0f0f0';
+      const color = ICON_COLOR[j]  || '#555';
+      const letter= ICON_LETTER[j] || '?';
+      const shortQ = (s.q||s.url||'').length > 60 ? (s.q||s.url||'').substring(0,60)+'…' : (s.q||s.url||'');
+      return `<a class="source-link" href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">
+        <div class="source-icon" style="background:${bg};color:${color}">${letter}</div>
+        <div class="source-info">
+          <div class="source-title">${esc(s.label)}</div>
+          <div class="source-desc">${esc(shortQ)}</div>
+        </div>
+        <span class="source-arrow">→</span>
+      </a>`;
+    }).join('');
+
+    const verifyBtnHtml = hasSources
+      ? `<button class="db-verify-btn" data-action="db-toggle-sources" data-id="${r.id}">
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.3"/><path d="M5 8.5l2 2 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          View sources
+        </button>`
+      : '';
+
+    const sourcesPanelHtml = hasSources
+      ? `<div class="db-history-sources" id="db-sources-${r.id}">
+          <div class="sources-heading">Sources used to verify this fact</div>
+          <div class="source-links">${sourceLinksHtml}</div>
+          <p class="sources-note">Each link opens a targeted Google search for the key claim in this fact. The fact was automatically verified against these sources when it was generated.</p>
+        </div>`
+      : '';
 
     item.innerHTML = `
       <div class="db-item-header" data-action="db-toggle" data-id="${r.id}">
@@ -1035,9 +1085,12 @@ function renderHistory() {
       </div>
       <div class="db-item-body">
         <div class="db-fact-text">${esc(r.fact||'')}</div>
-        <div class="db-sources"><strong>Verified via:</strong> ${sourcesHtml||'—'}</div>
-        <button class="db-fact-copy" data-action="db-copy" data-text="${esc(r.fact||'')}">Copy fact</button>
-        <span class="db-item-delete" data-action="db-delete" data-id="${r.id}">Delete entry</span>
+        <div class="db-actions">
+          ${verifyBtnHtml}
+          <button class="db-fact-copy" data-action="db-copy" data-text="${esc(r.fact||'')}">Copy fact</button>
+          <span class="db-item-delete" data-action="db-delete" data-id="${r.id}">Delete entry</span>
+        </div>
+        ${sourcesPanelHtml}
       </div>`;
     list.appendChild(item);
   });
