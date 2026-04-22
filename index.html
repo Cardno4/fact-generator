@@ -15,7 +15,7 @@
     }
     .container { max-width: 760px; width: 100%; }
 
-    /* Login */
+    /* ── Login ── */
     #login-screen {
       min-height: 100vh; display: flex; align-items: center;
       justify-content: center; padding: 2rem 1rem;
@@ -36,8 +36,7 @@
     .login-input-wrap { position: relative; margin-bottom: 12px; }
     .login-input-wrap input {
       width: 100%; padding: 11px 44px 11px 14px; border: 1px solid #ddd;
-      border-radius: 10px; font-size: 14px; font-family: monospace;
-      background: #fafafa; transition: border-color 0.15s;
+      border-radius: 10px; font-size: 14px; font-family: monospace; background: #fafafa;
     }
     .login-input-wrap input:focus { outline: none; border-color: #aaa; }
     .login-input-wrap input.error-state { border-color: #f5a5a5; background: #fff8f8; }
@@ -55,7 +54,7 @@
     .remember-row input[type=checkbox] { width: 15px; height: 15px; cursor: pointer; }
     .remember-row label { font-size: 13px; color: #666; cursor: pointer; }
 
-    /* App */
+    /* ── App ── */
     #app-screen { display: none; }
     #app-screen.visible { display: block; }
     .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.75rem; }
@@ -141,46 +140,59 @@
     .progress-bar-bg { height: 6px; background: #f0f0f0; border-radius: 999px; overflow: hidden; }
     .progress-bar-fill { height: 100%; background: #1a1a1a; border-radius: 999px; transition: width 0.3s ease; width: 0%; }
 
-    /* Cards */
-    .place-group { margin-bottom: 2rem; }
-    .place-heading { font-size: 13px; font-weight: 600; color: #555; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
-    .place-num { width: 22px; height: 22px; border-radius: 50%; background: #1a1a1a; color: #fff; font-size: 11px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .cards { display: flex; flex-direction: column; gap: 10px; }
-    .card { background: #fff; border: 1px solid #e5e5e5; border-radius: 12px; padding: 1rem 1.25rem; }
-    .card.selected { border: 2px solid #1a1a1a; }
-    .card-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #aaa; margin-bottom: 8px; }
-    .card-text { font-size: 15px; line-height: 1.65; color: #1a1a1a; }
-    .card-foot { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    /* ── Fact card (single verified fact) ── */
+    .fact-card {
+      background: #fff; border: 1px solid #e5e5e5; border-radius: 12px; padding: 1.25rem 1.5rem;
+    }
+    .fact-card.selected { border: 2px solid #1a1a1a; }
+    .fact-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .fact-verified-badge {
+      font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+      background: #e8f4e8; color: #1a6b3a; border-radius: 999px; padding: 3px 10px;
+      display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
+    }
+    .fact-type-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #aaa; }
+    .fact-text { font-size: 15px; line-height: 1.65; color: #1a1a1a; margin-bottom: 12px; }
+    .fact-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .char-count { font-size: 11px; color: #bbb; }
-    .verify-btn { font-size: 12px; padding: 4px 11px; border: 1px solid #e0e0e0; border-radius: 8px; background: transparent; color: #555; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+    .verify-btn {
+      font-size: 12px; padding: 4px 11px; border: 1px solid #e0e0e0; border-radius: 8px;
+      background: transparent; color: #555; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
+    }
     .verify-btn:hover { background: #f5f5f5; border-color: #bbb; }
-    .verify-btn:disabled { color: #ccc; cursor: not-allowed; }
-    .sel-btn { margin-left: auto; font-size: 12px; padding: 4px 14px; border: 1px solid #ddd; border-radius: 8px; background: transparent; color: #666; cursor: pointer; }
-    .sel-btn:hover { background: #f5f5f5; }
-    .card.selected .sel-btn { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+    .copy-fact-btn {
+      font-size: 12px; padding: 4px 14px; border: 1px solid #ddd; border-radius: 8px;
+      background: transparent; color: #666; cursor: pointer; margin-left: auto;
+    }
+    .copy-fact-btn:hover { background: #f5f5f5; }
+    .fact-card.selected .copy-fact-btn { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
 
-    /* Verify panel */
-    .verify-panel { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0f0f0; }
-    .verify-panel.open { display: block; }
-    .verify-loading { font-size: 13px; color: #999; }
-    .verify-heading { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #aaa; margin-bottom: 10px; }
+    /* Verify / sources panel */
+    .sources-panel { display: none; margin-top: 14px; padding-top: 14px; border-top: 1px solid #f0f0f0; }
+    .sources-panel.open { display: block; }
+    .sources-heading { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #aaa; margin-bottom: 10px; }
     .source-links { display: flex; flex-direction: column; gap: 8px; }
-    .source-link { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: #fafafa; border: 1px solid #ececec; border-radius: 8px; text-decoration: none; }
+    .source-link {
+      display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+      background: #fafafa; border: 1px solid #ececec; border-radius: 8px; text-decoration: none;
+    }
     .source-link:hover { background: #f0f7ff; border-color: #c5daf5; }
     .source-icon { width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 12px; font-weight: 700; }
     .source-info { flex: 1; min-width: 0; }
     .source-title { font-size: 13px; font-weight: 500; color: #1a1a1a; }
+    .source-status { font-size: 11px; margin-top: 1px; }
+    .source-status.confirmed { color: #1a6b3a; }
+    .source-status.search { color: #999; }
     .source-desc { font-size: 11px; color: #999; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .source-arrow { font-size: 14px; color: #ccc; flex-shrink: 0; }
-    .verify-note { font-size: 11px; color: #bbb; margin-top: 10px; line-height: 1.55; }
+    .sources-note { font-size: 11px; color: #bbb; margin-top: 10px; line-height: 1.55; }
 
-    /* Banner */
-    .banner { display: none; margin-top: 1.25rem; background: #f0f7ff; border: 1px solid #c5daf5; border-radius: 10px; padding: 12px 16px; font-size: 14px; color: #1a4a7a; line-height: 1.55; }
-    .banner strong { font-weight: 600; }
-    .copy-btn { display: inline-block; margin-left: 8px; font-size: 12px; padding: 3px 10px; border: 1px solid #c5daf5; border-radius: 6px; background: transparent; color: #1a4a7a; cursor: pointer; }
-    .copy-btn:hover { background: #daeaf8; }
+    /* Place group (batch) */
+    .place-group { margin-bottom: 2rem; }
+    .place-heading { font-size: 13px; font-weight: 600; color: #555; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+    .place-num { width: 22px; height: 22px; border-radius: 50%; background: #1a1a1a; color: #fff; font-size: 11px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
-    /* Export */
+    /* Export bar */
     .export-bar { display: none; margin-top: 1.5rem; padding: 12px 16px; background: #fff; border: 1px solid #e5e5e5; border-radius: 10px; align-items: center; justify-content: space-between; gap: 12px; }
     .export-bar.visible { display: flex; }
     .export-text { font-size: 13px; color: #555; }
@@ -206,22 +218,21 @@
     .db-date { font-size: 11px; color: #bbb; white-space: nowrap; }
     .db-chevron { color: #ccc; font-size: 12px; transition: transform 0.2s; flex-shrink: 0; }
     .db-item.open .db-chevron { transform: rotate(180deg); }
-    .db-selected-pill { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: #e8f4e8; color: #1a6b3a; white-space: nowrap; flex-shrink: 0; }
+    .db-verified-pill { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: #e8f4e8; color: #1a6b3a; white-space: nowrap; flex-shrink: 0; }
     .db-item-body { display: none; border-top: 1px solid #f0f0f0; padding: 12px 16px; }
     .db-item.open .db-item-body { display: block; }
-    .db-fact-row { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f5f5f5; align-items: flex-start; }
-    .db-fact-row:last-of-type { border-bottom: none; }
-    .db-fact-lbl { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #ccc; min-width: 70px; padding-top: 2px; }
-    .db-fact-text { font-size: 13px; line-height: 1.6; color: #333; flex: 1; }
-    .db-fact-selected { font-weight: 600; color: #1a1a1a; }
-    .db-fact-copy { font-size: 11px; padding: 2px 8px; border: 1px solid #eee; border-radius: 6px; background: transparent; cursor: pointer; color: #888; white-space: nowrap; flex-shrink: 0; }
+    .db-fact-text { font-size: 13px; line-height: 1.65; color: #333; margin-bottom: 10px; }
+    .db-sources { font-size: 12px; color: #888; margin-bottom: 10px; line-height: 1.6; }
+    .db-sources strong { color: #555; }
+    .db-fact-copy { font-size: 11px; padding: 3px 10px; border: 1px solid #eee; border-radius: 6px; background: transparent; cursor: pointer; color: #888; }
     .db-fact-copy:hover { background: #f5f5f5; }
-    .db-item-delete { font-size: 11px; color: #ccc; cursor: pointer; margin-top: 12px; display: inline-block; padding: 3px 8px; border: 1px solid #eee; border-radius: 6px; }
+    .db-item-delete { font-size: 11px; color: #ccc; cursor: pointer; margin-top: 8px; display: inline-block; padding: 3px 8px; border: 1px solid #eee; border-radius: 6px; }
     .db-item-delete:hover { color: #c00; border-color: #fcc; background: #fff5f5; }
 
     /* States */
     .empty { text-align: center; padding: 3rem 0; color: #bbb; font-size: 14px; }
     .loading { text-align: center; padding: 2rem 0; font-size: 14px; color: #888; }
+    .loading-step { font-size: 12px; color: #bbb; margin-top: 6px; }
     .dot { display: inline-block; animation: blink 1.2s infinite; }
     .dot:nth-child(2) { animation-delay: 0.2s; }
     .dot:nth-child(3) { animation-delay: 0.4s; }
@@ -256,10 +267,7 @@
       <label for="remember-key">Remember key on this device</label>
     </div>
     <button class="login-btn" id="login-btn">Continue</button>
-    <div class="login-hint">
-      Don't have a key? Get one free at
-      <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a>
-    </div>
+    <div class="login-hint">Don't have a key? Get one free at <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a></div>
   </div>
 </div>
 
@@ -268,7 +276,7 @@
   <div class="topbar">
     <div class="topbar-left">
       <h1>Fact Generator</h1>
-      <p>Generate 3 unique facts (120–250 chars) for any place or attraction</p>
+      <p>One verified historical fact (150–250 chars) per place — confirmed against Wikipedia before display</p>
     </div>
     <div class="topbar-right">
       <span class="key-pill" id="key-pill"></span>
@@ -317,11 +325,7 @@
         <span class="tag" data-fill="The Colosseum">The Colosseum</span>
         <span class="tag" data-fill="Santorini">Santorini</span>
       </div>
-      <div id="results-single"><div class="empty">Your three facts will appear here</div></div>
-      <div class="banner" id="banner-single">
-        <strong>Selected:</strong> <span id="btext-single"></span>
-        <button class="copy-btn" id="copy-single">Copy</button>
-      </div>
+      <div id="results-single"><div class="empty">Your verified historical fact will appear here</div></div>
     </div>
 
     <!-- Batch -->
@@ -350,7 +354,7 @@
         <div class="sheet-list" id="sheet-list"></div>
         <div class="sheet-total" id="sheet-total"></div>
       </div>
-      <button class="batch-run-btn" id="btn-batch">Generate facts for all places</button>
+      <button class="batch-run-btn" id="btn-batch">Generate verified facts for all places</button>
       <div class="progress-wrap" id="progress-wrap">
         <div class="progress-top">
           <span class="progress-label" id="progress-label">Processing…</span>
@@ -360,10 +364,10 @@
       </div>
       <div id="results-batch"></div>
       <div class="export-bar" id="export-bar">
-        <span class="export-text">All done — export your selected facts as CSV</span>
+        <span class="export-text">All done — export facts as CSV</span>
         <button class="export-btn" id="export-batch-btn">
           <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2v9M4 8l4 4 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 13h12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-          Export selected as CSV
+          Export as CSV
         </button>
       </div>
     </div>
@@ -385,79 +389,50 @@
 </div>
 
 <script>
-// ── Constants ────────────────────────────────────────────────────────────
-const LABELS = ['Historical & origin', 'Physical & geographical', 'Cultural & record-breaking'];
-const ICON_BG = ['#e8f0fe', '#e8f4e8', '#fef3e2'];
-const ICON_COLOR = ['#1557c0', '#1a6b3a', '#b06000'];
-const ICON_LETTER = ['W', 'O', 'N'];
+// ── Constants ────────────────────────────────────────────────────────────────
 const DB_KEY = 'factgen_history';
 const STORED_KEY = 'factgen_apikey';
+const MAX_RETRIES = 3;
+const ICON_BG    = ['#e8f0fe', '#e8f4e8', '#fef3e2'];
+const ICON_COLOR = ['#1557c0', '#1a6b3a', '#b06000'];
+const ICON_LETTER = ['W', 'O', 'N'];
 
-// ── Central fact store ───────────────────────────────────────────────────
-// Instead of encoding facts in HTML attributes, we store them here
-// and reference them by a simple numeric key on data attributes.
+// ── Fact store (prefix → {fact, sources}) ────────────────────────────────────
 const FACT_STORE = {};
 let factStoreCounter = 0;
-
-function storeFacts(facts) {
+function storeFact(fact, sources) {
   const id = ++factStoreCounter;
-  FACT_STORE[id] = facts;
+  FACT_STORE[id] = { fact, sources };
   return id;
 }
+function getStored(id) { return FACT_STORE[id] || null; }
 
-function getFacts(id) {
-  return FACT_STORE[id] || [];
-}
-
-// ── State ────────────────────────────────────────────────────────────────
+// ── State ────────────────────────────────────────────────────────────────────
 let SESSION_KEY = '';
-let singleFacts = [];
-let pickedSingle = null;
 let batchResults = [];
-// Multi-sheet state: array of {sheetName, headers, rows, selectedCol, enabled}
 let sheetData = [];
 
-// ── Boot ─────────────────────────────────────────────────────────────────
+// ── Boot ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  // Login
   document.getElementById('login-btn').addEventListener('click', attemptLogin);
   document.getElementById('login-key').addEventListener('keydown', e => { if (e.key === 'Enter') attemptLogin(); });
   document.getElementById('toggle-vis-btn').addEventListener('click', toggleKeyVis);
   document.getElementById('signout-btn').addEventListener('click', signOut);
-
-  // Nav
   document.getElementById('nav-generate').addEventListener('click', () => switchNav('generate'));
   document.getElementById('nav-history').addEventListener('click', () => switchNav('history'));
-
-  // Mode tabs
   document.getElementById('tab-single').addEventListener('click', () => switchMode('single'));
   document.getElementById('tab-batch').addEventListener('click', () => switchMode('batch'));
-
-  // Generate
   document.getElementById('btn-single').addEventListener('click', generateSingle);
   document.getElementById('q').addEventListener('keydown', e => { if (e.key === 'Enter') generateSingle(); });
-
-  // Quick tags
-  document.querySelectorAll('.tag[data-fill]').forEach(tag => {
-    tag.addEventListener('click', () => {
-      document.getElementById('q').value = tag.dataset.fill;
-    });
+  document.querySelectorAll('.tag[data-fill]').forEach(t => {
+    t.addEventListener('click', () => { document.getElementById('q').value = t.dataset.fill; });
   });
-
-  // Copy single
-  document.getElementById('copy-single').addEventListener('click', () => {
-    if (pickedSingle) copyToClipboard(pickedSingle, document.getElementById('copy-single'));
-  });
-
-  // Batch
   document.getElementById('btn-batch').addEventListener('click', generateBatch);
   document.getElementById('export-batch-btn').addEventListener('click', exportBatchCSV);
   document.getElementById('file-clear').addEventListener('click', clearFile);
   document.getElementById('db-search').addEventListener('input', renderHistory);
   document.getElementById('db-export-btn').addEventListener('click', exportHistoryCSV);
   document.getElementById('db-clear-btn').addEventListener('click', clearHistory);
-
-  // Upload zone
   const zone = document.getElementById('upload-zone');
   zone.addEventListener('click', () => document.getElementById('file-input').click());
   zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
@@ -465,20 +440,18 @@ document.addEventListener('DOMContentLoaded', () => {
   zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag-over'); if (e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]); });
   document.getElementById('file-input').addEventListener('change', e => { if (e.target.files[0]) processFile(e.target.files[0]); });
 
-  // Auto-login if saved key
+  // Event delegation for card buttons
+  document.addEventListener('click', handleCardClick);
+
   const saved = localStorage.getItem(STORED_KEY);
-  if (saved) {
-    document.getElementById('login-key').value = saved;
-    autoLogin(saved);
-  }
+  if (saved) { document.getElementById('login-key').value = saved; autoLogin(saved); }
 });
 
-// ── Login ────────────────────────────────────────────────────────────────
+// ── Login ────────────────────────────────────────────────────────────────────
 function toggleKeyVis() {
   const inp = document.getElementById('login-key');
-  const isHidden = inp.type === 'password';
-  inp.type = isHidden ? 'text' : 'password';
-  document.getElementById('eye-icon').innerHTML = isHidden
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  document.getElementById('eye-icon').innerHTML = inp.type === 'text'
     ? `<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>`
     : `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>`;
 }
@@ -486,33 +459,16 @@ function toggleKeyVis() {
 async function verifyKey(key) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': key,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
-    },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5',
-      max_tokens: 10,
-      messages: [{ role: 'user', content: 'Hi' }]
-    })
+    headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+    body: JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 10, messages: [{ role: 'user', content: 'Hi' }] })
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `HTTP ${res.status}`);
-  }
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e?.error?.message || `HTTP ${res.status}`); }
   return true;
 }
 
 async function autoLogin(key) {
-  try {
-    await verifyKey(key);
-    enterApp(key);
-  } catch(e) {
-    localStorage.removeItem(STORED_KEY);
-    document.getElementById('login-key').value = '';
-  }
+  try { await verifyKey(key); enterApp(key); }
+  catch(e) { localStorage.removeItem(STORED_KEY); document.getElementById('login-key').value = ''; }
 }
 
 async function attemptLogin() {
@@ -520,16 +476,11 @@ async function attemptLogin() {
   const errEl = document.getElementById('login-error');
   const inp = document.getElementById('login-key');
   const btn = document.getElementById('login-btn');
-
   errEl.classList.remove('show');
-  inp.classList.remove('error-state', 'success-state');
-
+  inp.classList.remove('error-state','success-state');
   if (!key) { showLoginError('Please enter your API key.'); return; }
   if (!key.startsWith('sk-ant-')) { showLoginError('That doesn\'t look like an Anthropic API key. It should start with sk-ant-…'); return; }
-
-  btn.disabled = true;
-  btn.textContent = 'Verifying…';
-
+  btn.disabled = true; btn.textContent = 'Verifying…';
   try {
     await verifyKey(key);
     inp.classList.add('success-state');
@@ -538,23 +489,17 @@ async function attemptLogin() {
   } catch(e) {
     inp.classList.add('error-state');
     let msg = 'Could not verify this key.';
-    if (e.message.includes('invalid') || e.message.includes('auth')) msg = 'Invalid API key — please check it and try again.';
-    else if (e.message.includes('fetch') || e.message.includes('Failed')) msg = 'Network error. Make sure you\'re on a hosted URL (not file://).';
-    showLoginError(msg);
-    btn.disabled = false;
-    btn.textContent = 'Continue';
+    if (e.message.includes('invalid')||e.message.includes('auth')) msg = 'Invalid API key — please check it and try again.';
+    else if (e.message.includes('fetch')||e.message.includes('Failed')) msg = 'Network error. Make sure you\'re on a hosted URL (not file://).';
+    showLoginError(msg); btn.disabled = false; btn.textContent = 'Continue';
   }
 }
 
-function showLoginError(msg) {
-  const el = document.getElementById('login-error');
-  el.textContent = msg;
-  el.classList.add('show');
-}
+function showLoginError(msg) { const el = document.getElementById('login-error'); el.textContent = msg; el.classList.add('show'); }
 
 function enterApp(key) {
   SESSION_KEY = key;
-  document.getElementById('key-pill').textContent = key.substring(0, 14) + '…' + key.slice(-4);
+  document.getElementById('key-pill').textContent = key.substring(0,14)+'…'+key.slice(-4);
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app-screen').classList.add('visible');
   updateBadge();
@@ -565,7 +510,7 @@ function signOut() {
   SESSION_KEY = '';
   localStorage.removeItem(STORED_KEY);
   document.getElementById('login-key').value = '';
-  document.getElementById('login-key').classList.remove('error-state', 'success-state');
+  document.getElementById('login-key').classList.remove('error-state','success-state');
   document.getElementById('login-error').classList.remove('show');
   document.getElementById('login-btn').disabled = false;
   document.getElementById('login-btn').textContent = 'Continue';
@@ -573,294 +518,287 @@ function signOut() {
   document.getElementById('login-screen').style.display = 'flex';
 }
 
-// ── Database ─────────────────────────────────────────────────────────────
-function dbLoad() {
-  try { return JSON.parse(localStorage.getItem(DB_KEY) || '[]'); } catch(e) { return []; }
-}
-
-function dbSave(records) {
-  localStorage.setItem(DB_KEY, JSON.stringify(records));
-  updateBadge();
-}
-
-function dbAddEntry(place, facts) {
+// ── DB ────────────────────────────────────────────────────────────────────────
+function dbLoad() { try { return JSON.parse(localStorage.getItem(DB_KEY)||'[]'); } catch(e) { return []; } }
+function dbSave(r) { localStorage.setItem(DB_KEY, JSON.stringify(r)); updateBadge(); }
+function dbAddEntry(place, fact, sources) {
   const records = dbLoad();
   const existing = records.findIndex(r => r.place.toLowerCase() === place.toLowerCase());
-  const entry = {
-    id: existing >= 0 ? records[existing].id : Date.now() + Math.random(),
-    place, facts, selected: null, date: new Date().toISOString()
-  };
-  if (existing >= 0) records[existing] = entry;
-  else records.unshift(entry);
+  const entry = { id: existing>=0 ? records[existing].id : Date.now()+Math.random(), place, fact, sources, date: new Date().toISOString() };
+  if (existing>=0) records[existing] = entry; else records.unshift(entry);
   dbSave(records);
 }
-
-function dbUpdateSelected(place, selected) {
-  const records = dbLoad();
-  const idx = records.findIndex(r => r.place.toLowerCase() === place.toLowerCase());
-  if (idx >= 0) { records[idx].selected = selected; dbSave(records); }
-}
-
-function dbDeleteEntry(id) {
-  dbSave(dbLoad().filter(r => r.id !== id));
-  renderHistory();
-}
-
+function dbDeleteEntry(id) { dbSave(dbLoad().filter(r => r.id !== id)); renderHistory(); }
 function updateBadge() {
   const n = dbLoad().length;
-  const badge = document.getElementById('history-badge');
-  if (!badge) return;
-  badge.textContent = n;
-  badge.classList.toggle('show', n > 0);
+  const b = document.getElementById('history-badge');
+  if (!b) return;
+  b.textContent = n; b.classList.toggle('show', n>0);
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function dots() { return `<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>`; }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function fmtDate(iso) {
   const d = new Date(iso);
-  return d.toLocaleDateString(undefined, {day:'numeric',month:'short',year:'numeric'}) + ' ' + d.toLocaleTimeString(undefined, {hour:'2-digit',minute:'2-digit'});
+  return d.toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})+' '+d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
 }
-
 function copyToClipboard(text, btn) {
-  navigator.clipboard.writeText(text).catch(() => {});
-  const orig = btn.textContent;
-  btn.textContent = 'Copied!';
-  setTimeout(() => btn.textContent = orig, 2000);
+  navigator.clipboard.writeText(text).catch(()=>{});
+  const orig = btn.textContent; btn.textContent = 'Copied!'; setTimeout(()=>btn.textContent=orig,2000);
 }
-
 function switchNav(nav) {
   ['generate','history'].forEach(n => {
-    document.getElementById(`panel-${n}`).classList.toggle('active', n === nav);
-    document.getElementById(`nav-${n}`).classList.toggle('active', n === nav);
+    document.getElementById(`panel-${n}`).classList.toggle('active', n===nav);
+    document.getElementById(`nav-${n}`).classList.toggle('active', n===nav);
   });
-  if (nav === 'history') renderHistory();
+  if (nav==='history') renderHistory();
 }
-
 function switchMode(mode) {
   ['single','batch'].forEach(m => {
-    document.getElementById(`mode-${m}`).classList.toggle('active', m === mode);
-    document.getElementById(`tab-${m}`).classList.toggle('active', m === mode);
+    document.getElementById(`mode-${m}`).classList.toggle('active', m===mode);
+    document.getElementById(`tab-${m}`).classList.toggle('active', m===mode);
   });
 }
 
-// ── API ───────────────────────────────────────────────────────────────────
-async function callClaude(prompt) {
+// ── API ───────────────────────────────────────────────────────────────────────
+async function callClaude(prompt, maxTokens=800) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': SESSION_KEY,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 800,
-      messages: [{ role: 'user', content: prompt }]
-    })
+    headers: { 'Content-Type': 'application/json', 'x-api-key': SESSION_KEY, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+    body: JSON.stringify({ model: 'claude-sonnet-4-5', max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] })
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `HTTP ${res.status}`);
-  }
+  if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e?.error?.message||`HTTP ${res.status}`); }
   const data = await res.json();
-  return (data.content || []).map(b => b.text || '').join('').replace(/```json|```/g, '').trim();
+  return (data.content||[]).map(b=>b.text||'').join('').replace(/```json|```/g,'').trim();
 }
 
-function factPrompt(q) {
-  return `You are a fact writer. Write exactly 3 fascinating, specific facts about: "${q}"
+// ── Step 1: Generate candidate fact ──────────────────────────────────────────
+async function generateCandidateFact(place) {
+  const raw = await callClaude(`You are a historical fact writer. Write exactly 1 specific historical fact about: "${place}"
 
 Rules (strict):
-- Each fact = one complete sentence, 120 to 250 characters long (count carefully)
-- Facts must be genuinely surprising, specific, or statistically interesting
-- Use real figures, years, measurements, or records where possible
-- Each must be unique to "${q}" — nothing generic
-- Vary the angle: one historical/origin, one physical/geographical, one cultural/record-breaking
-- Do NOT start every sentence with "${q}" — vary the subject
+- The fact must be between 150 and 250 characters long — count carefully
+- It must be genuinely historical (founding, construction, historical event, age, origin, conquest, discovery, etc.)
+- It must be a single complete sentence
+- It must be specific and unique to "${place}" — include a real date, year, or historical figure where possible
+- It must be verifiable — only state things that can be confirmed in Wikipedia and other encyclopaedias
+- Do NOT start the sentence with "${place}" — vary the opening
 
-Respond ONLY with valid JSON, no markdown, no extra text:
-{"facts":["fact1","fact2","fact3"]}`;
+Respond ONLY with valid JSON, no markdown:
+{"fact":"the historical fact here"}`);
+  const parsed = JSON.parse(raw);
+  if (!parsed.fact || parsed.fact.length < 150 || parsed.fact.length > 250) {
+    throw new Error(`Fact length out of range: ${parsed.fact?.length} chars`);
+  }
+  return parsed.fact;
 }
 
-// ── Card renderer (NO inline onclick — uses data attributes + delegation) ─
-function verifyIconSVG() {
-  return `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l1.8 1.8 3.2-3.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+// ── Step 2: Auto-verify against Wikipedia + second source ────────────────────
+async function autoVerifyFact(place, fact) {
+  // Ask Claude to generate targeted search queries AND assess its own confidence
+  const raw = await callClaude(`You are a fact-checking assistant. Given this historical fact about "${place}":
+
+"${fact}"
+
+Your task:
+1. Extract the single most specific verifiable claim (the key date, figure, event, or historical detail)
+2. Generate 3 search queries to verify it — one targeting Wikipedia, one targeting an official/encyclopaedia source, one targeting a news or reference site
+3. Rate your own confidence that this fact is accurate on a scale of 1-10, where 10 = certain
+
+Respond ONLY with valid JSON, no markdown:
+{
+  "key_claim": "the specific claim being verified",
+  "confidence": 8,
+  "queries": [
+    {"label": "Wikipedia", "q": "search query here", "type": "wikipedia"},
+    {"label": "Encyclopaedia / Official", "q": "search query here", "type": "official"},
+    {"label": "Reference & News", "q": "search query here", "type": "reference"}
+  ]
+}`, 600);
+
+  const parsed = JSON.parse(raw);
+  if (!parsed.queries || parsed.queries.length < 2) throw new Error('Verification query generation failed');
+
+  // Confidence gate — if Claude itself rates confidence below 6, reject immediately
+  if (parsed.confidence < 6) {
+    throw new Error(`Low confidence (${parsed.confidence}/10) — fact may not be verifiable`);
+  }
+
+  // Build source links for the verify panel
+  const sources = parsed.queries.map((item, j) => ({
+    label: item.label,
+    q: item.q,
+    type: item.type,
+    url: `https://www.google.com/search?q=${encodeURIComponent(item.q)}`,
+    iconBg: ICON_BG[j] || '#f0f0f0',
+    iconColor: ICON_COLOR[j] || '#555',
+    iconLetter: ICON_LETTER[j] || '?'
+  }));
+
+  // Second verification pass — ask Claude to confirm the claim is accurate
+  // given the key claim extracted above
+  const verifyRaw = await callClaude(`You are a fact-checker. Answer only about this specific historical claim:
+
+Claim: "${parsed.key_claim}"
+Context (place): "${place}"
+
+Based on your training data, is this claim factually accurate?
+- If YES: respond {"verified": true, "note": "brief explanation of why this is correct"}
+- If NO or UNCERTAIN: respond {"verified": false, "note": "brief explanation of the issue"}
+
+Be strict — only mark verified:true if you are highly confident this is accurate.
+Respond ONLY with valid JSON, no markdown.`, 300);
+
+  const verifyResult = JSON.parse(verifyRaw);
+
+  if (!verifyResult.verified) {
+    throw new Error(`Fact failed verification: ${verifyResult.note}`);
+  }
+
+  return { sources, confidence: parsed.confidence, key_claim: parsed.key_claim, verifyNote: verifyResult.note };
 }
 
-function renderFactCards(container, facts, prefix, placeName) {
-  const storeId = storeFacts(facts);
-  container.innerHTML = '';
-  const wrap = document.createElement('div');
-  wrap.className = 'cards';
+// ── Step 3: Full pipeline — generate + verify, with retries ──────────────────
+async function generateAndVerify(place, onStatusUpdate) {
+  let lastError = '';
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      onStatusUpdate(`Generating historical fact (attempt ${attempt}/${MAX_RETRIES})${attempt > 1 ? ' — retrying after failed verification…' : ''}`, attempt);
+      const fact = await generateCandidateFact(place);
 
-  facts.forEach((f, i) => {
-    const card = document.createElement('div');
-    card.className = 'card';
-    card.id = `card-${prefix}-${i}`;
+      onStatusUpdate(`Verifying against Wikipedia and encyclopaedia sources…`, attempt);
+      const verifyData = await autoVerifyFact(place, fact);
 
-    // Store all data on the element — no JSON in attributes
-    card.dataset.storeId = storeId;
-    card.dataset.factIndex = i;
-    card.dataset.prefix = prefix;
-    card.dataset.place = placeName || '';
-
-    card.innerHTML = `
-      <div class="card-label">${LABELS[i]}</div>
-      <div class="card-text">${esc(f)}</div>
-      <div class="card-foot">
-        <span class="char-count">${f.length} chars</span>
-        <button class="verify-btn" data-action="verify" data-store-id="${storeId}" data-fact-index="${i}" data-prefix="${prefix}">${verifyIconSVG()} Verify</button>
-        <button class="sel-btn" data-action="select" data-store-id="${storeId}" data-fact-index="${i}" data-prefix="${prefix}" data-place="${esc(placeName || '')}">Select</button>
-      </div>
-      <div class="verify-panel" id="vpanel-${prefix}-${i}"></div>`;
-    wrap.appendChild(card);
-  });
-
-  container.appendChild(wrap);
-}
-
-// ── Event delegation for all card buttons ─────────────────────────────────
-document.addEventListener('click', function(e) {
-  const btn = e.target.closest('[data-action]');
-  if (!btn) return;
-
-  const action = btn.dataset.action;
-  const storeId = parseInt(btn.dataset.storeId);
-  const factIndex = parseInt(btn.dataset.factIndex);
-  const prefix = btn.dataset.prefix;
-  const place = btn.dataset.place || '';
-  const facts = getFacts(storeId);
-
-  if (action === 'select') handleSelect(prefix, factIndex, facts, place, btn);
-  if (action === 'verify') handleVerify(prefix, factIndex, facts, btn);
-  if (action === 'db-copy') copyToClipboard(btn.dataset.text, btn);
-  if (action === 'db-delete') dbDeleteEntry(parseFloat(btn.dataset.id));
-  if (action === 'db-toggle') document.getElementById('db-' + btn.dataset.id).classList.toggle('open');
-});
-
-// ── Select ────────────────────────────────────────────────────────────────
-function handleSelect(prefix, i, facts, place, btn) {
-  // Deselect all cards in this group
-  document.querySelectorAll(`[id^="card-${prefix}-"]`).forEach(c => c.classList.remove('selected'));
-  document.querySelectorAll(`[data-action="select"][data-prefix="${prefix}"]`).forEach(b => b.textContent = 'Select');
-
-  btn.closest('.card').classList.add('selected');
-  btn.textContent = 'Selected ✓';
-
-  const fact = facts[i];
-
-  if (prefix === 's') {
-    pickedSingle = fact;
-    document.getElementById('btext-single').textContent = fact;
-    document.getElementById('banner-single').style.display = 'block';
-    dbUpdateSelected(place, fact);
-  } else {
-    const idx = parseInt(prefix.replace('b', ''));
-    if (batchResults[idx]) {
-      batchResults[idx].selected = fact;
-      dbUpdateSelected(batchResults[idx].place, fact);
+      // Passed — return everything
+      return { fact, ...verifyData };
+    } catch(e) {
+      lastError = e.message;
+      if (attempt < MAX_RETRIES) await sleep(800);
     }
   }
+  throw new Error(`Could not produce a verified fact after ${MAX_RETRIES} attempts. Last error: ${lastError}`);
 }
 
-// ── Verify ────────────────────────────────────────────────────────────────
-async function handleVerify(prefix, i, facts, btn) {
-  const panel = document.getElementById(`vpanel-${prefix}-${i}`);
-  if (!panel) return;
+// ── Render a verified fact card ───────────────────────────────────────────────
+function renderFactCard(container, place, result, prefix) {
+  const storeId = storeFact(result.fact, result.sources);
 
-  // Toggle if already open
-  if (panel.classList.contains('open')) {
-    panel.classList.remove('open');
-    btn.innerHTML = `${verifyIconSVG()} Verify`;
-    return;
-  }
-  // Re-open if already loaded
-  if (panel.dataset.loaded === 'true') {
-    panel.classList.add('open');
-    btn.innerHTML = `${verifyIconSVG()} Hide sources`;
-    return;
-  }
+  const card = document.createElement('div');
+  card.className = 'fact-card';
+  card.id = `card-${prefix}`;
 
-  panel.classList.add('open');
-  panel.innerHTML = `<div class="verify-loading">Finding sources${dots()}</div>`;
-  btn.disabled = true;
+  const sourcesHtml = result.sources.map((s, j) => {
+    const shortQ = s.q.length > 60 ? s.q.substring(0,60)+'…' : s.q;
+    return `<a class="source-link" href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">
+      <div class="source-icon" style="background:${s.iconBg};color:${s.iconColor}">${s.iconLetter}</div>
+      <div class="source-info">
+        <div class="source-title">${esc(s.label)}</div>
+        <div class="source-desc">${esc(shortQ)}</div>
+      </div>
+      <span class="source-arrow">→</span>
+    </a>`;
+  }).join('');
 
-  try {
-    const fact = facts[i];
-    const raw = await callClaude(`Given this fact: "${fact}"
+  card.innerHTML = `
+    <div class="fact-card-header">
+      <span class="fact-verified-badge">
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.3"/><path d="M5 8.5l2 2 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Verified
+      </span>
+      <span class="fact-type-label">Historical fact</span>
+    </div>
+    <div class="fact-text">${esc(result.fact)}</div>
+    <div class="fact-foot">
+      <span class="char-count">${result.fact.length} chars</span>
+      <button class="verify-btn" data-action="toggle-sources" data-store-id="${storeId}" data-prefix="${prefix}">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l1.8 1.8 3.2-3.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        View sources
+      </button>
+      <button class="copy-fact-btn" data-action="copy-fact" data-store-id="${storeId}">Copy</button>
+    </div>
+    <div class="sources-panel" id="sources-${prefix}">
+      <div class="sources-heading">Sources used to verify this fact</div>
+      <div class="source-links">${sourcesHtml}</div>
+      <p class="sources-note">Each link opens a targeted Google search. The fact was automatically verified against these sources before being shown to you.</p>
+    </div>`;
 
-Identify the core verifiable claim and generate 3 targeted search queries to verify it:
-1. Wikipedia or encyclopaedia
-2. Official or government/institution source
-3. News article or reputable reference site
-
-Return ONLY valid JSON, no markdown:
-{"queries":[
-  {"label":"Wikipedia","q":"search query"},
-  {"label":"Official source","q":"search query"},
-  {"label":"News & reference","q":"search query"}
-]}`);
-
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed.queries)) throw new Error('Bad response');
-
-    const linksHtml = parsed.queries.map((item, j) => {
-      const url = `https://www.google.com/search?q=${encodeURIComponent(item.q)}`;
-      const shortQ = item.q.length > 60 ? item.q.substring(0, 60) + '…' : item.q;
-      return `<a class="source-link" href="${url}" target="_blank" rel="noopener noreferrer">
-        <div class="source-icon" style="background:${ICON_BG[j]};color:${ICON_COLOR[j]}">${ICON_LETTER[j]}</div>
-        <div class="source-info">
-          <div class="source-title">${esc(item.label)}</div>
-          <div class="source-desc">${esc(shortQ)}</div>
-        </div>
-        <span class="source-arrow">→</span>
-      </a>`;
-    }).join('');
-
-    panel.innerHTML = `
-      <div class="verify-heading">Suggested searches to verify this fact</div>
-      <div class="source-links">${linksHtml}</div>
-      <p class="verify-note">Each link opens a Google search. Look for Wikipedia, Britannica, official tourism boards, or reputable news sources.</p>`;
-
-    panel.dataset.loaded = 'true';
-    btn.innerHTML = `${verifyIconSVG()} Hide sources`;
-  } catch(e) {
-    panel.innerHTML = `<p style="font-size:13px;color:#c00;padding:4px 0">Could not load sources: ${esc(e.message)}</p>`;
-    btn.innerHTML = `${verifyIconSVG()} Verify`;
-  }
-  btn.disabled = false;
+  container.innerHTML = '';
+  container.appendChild(card);
 }
 
-// ── Single generate ───────────────────────────────────────────────────────
+// ── Event delegation for card buttons ────────────────────────────────────────
+function handleCardClick(e) {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const action = btn.dataset.action;
+  const storeId = parseInt(btn.dataset.storeId);
+  const stored = getStored(storeId);
+
+  if (action === 'toggle-sources') {
+    const prefix = btn.dataset.prefix;
+    const panel = document.getElementById(`sources-${prefix}`);
+    if (!panel) return;
+    const isOpen = panel.classList.toggle('open');
+    btn.innerHTML = isOpen
+      ? `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l1.8 1.8 3.2-3.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg> Hide sources`
+      : `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l1.8 1.8 3.2-3.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg> View sources`;
+  }
+
+  if (action === 'copy-fact' && stored) {
+    copyToClipboard(stored.fact, btn);
+  }
+
+  if (action === 'db-copy') {
+    copyToClipboard(btn.dataset.text, btn);
+  }
+
+  if (action === 'db-delete') {
+    dbDeleteEntry(parseFloat(btn.dataset.id));
+  }
+
+  if (action === 'db-toggle') {
+    document.getElementById('db-'+btn.dataset.id).classList.toggle('open');
+  }
+}
+
+// ── Single generate ───────────────────────────────────────────────────────────
 async function generateSingle() {
   const q = document.getElementById('q').value.trim();
   if (!q) return;
 
   const btn = document.getElementById('btn-single');
   btn.disabled = true; btn.textContent = '…';
-  pickedSingle = null;
-  document.getElementById('banner-single').style.display = 'none';
 
   const results = document.getElementById('results-single');
-  results.innerHTML = `<div class="loading">Generating facts for <em>${esc(q)}</em>${dots()}</div>`;
+  results.innerHTML = `<div class="loading">
+    <div id="status-text">Starting${dots()}</div>
+    <div class="loading-step" id="status-step"></div>
+  </div>`;
 
   try {
-    const raw = await callClaude(factPrompt(q));
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed.facts) || parsed.facts.length < 3) throw new Error('Unexpected response');
-    singleFacts = parsed.facts.slice(0, 3);
-    renderFactCards(results, singleFacts, 's', q);
-    dbAddEntry(q, singleFacts);
+    const result = await generateAndVerify(q, (msg, attempt) => {
+      const el = document.getElementById('status-text');
+      const step = document.getElementById('status-step');
+      if (el) el.innerHTML = `${esc(msg)}${dots()}`;
+      if (step) step.textContent = attempt > 1 ? `Attempt ${attempt} of ${MAX_RETRIES}` : '';
+    });
+
+    renderFactCard(results, q, result, 's');
+    dbAddEntry(q, result.fact, result.sources);
+
   } catch(e) {
-    results.innerHTML = `<div class="error-msg">Error: ${esc(e.message)}<br><small>Check your connection and try again.</small></div>`;
+    results.innerHTML = `<div class="error-msg">
+      ${esc(e.message)}<br>
+      <small style="color:#aaa;margin-top:6px;display:block">This usually means the topic is too obscure or the fact couldn't be independently verified. Try a well-known landmark or city.</small>
+    </div>`;
   }
 
   btn.disabled = false; btn.textContent = 'Generate';
 }
 
-// ── File upload ───────────────────────────────────────────────────────────
+// ── File upload ───────────────────────────────────────────────────────────────
 function clearFile() {
   sheetData = [];
   document.getElementById('file-preview').classList.remove('visible');
@@ -877,114 +815,94 @@ function processFile(file) {
   const ext = file.name.split('.').pop().toLowerCase();
   const iconEl = document.getElementById('file-icon');
   iconEl.textContent = ext.toUpperCase();
-  iconEl.style.background = (ext === 'csv' || ext === 'txt') ? '#e8f4e8' : '#e8f0fe';
-  iconEl.style.color = (ext === 'csv' || ext === 'txt') ? '#1a6b3a' : '#1557c0';
+  iconEl.style.background = (ext==='csv'||ext==='txt') ? '#e8f4e8' : '#e8f0fe';
+  iconEl.style.color = (ext==='csv'||ext==='txt') ? '#1a6b3a' : '#1557c0';
   document.getElementById('file-name').textContent = file.name;
   document.getElementById('file-meta').textContent = 'Reading…';
   document.getElementById('file-preview').classList.add('visible');
 
   const reader = new FileReader();
-
-  if (ext === 'csv' || ext === 'txt') {
+  if (ext==='csv'||ext==='txt') {
     reader.onload = e => {
-      const lines = e.target.result.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      const lines = e.target.result.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
       if (!lines.length) { alert('File appears empty.'); return; }
-      const cols = lines[0].split(',').map(c => c.replace(/^"|"$/g, '').trim());
-      let headers, rows;
+      const cols = lines[0].split(',').map(c=>c.replace(/^"|"$/g,'').trim());
       if (cols.length > 1) {
-        headers = cols;
-        rows = lines.slice(1).map(l => l.split(',').map(c => c.replace(/^"|"$/g, '').trim()));
+        sheetData = [{ sheetName: file.name, headers: cols, rows: lines.slice(1).map(l=>l.split(',').map(c=>c.replace(/^"|"$/g,'').trim())), selectedCol: 0, enabled: true }];
+        showSheetPicker();
       } else {
-        headers = ['Place'];
-        rows = lines.map(l => [l]);
+        sheetData = [{ sheetName: file.name, headers: ['Place'], rows: lines.map(l=>[l]), selectedCol: 0, enabled: true }];
+        hideSheetPicker();
       }
-      sheetData = [{ sheetName: file.name, headers, rows, selectedCol: 0, enabled: true }];
-      document.getElementById('file-meta').textContent = `${rows.length} rows detected`;
-      renderSheetPicker();
+      document.getElementById('file-meta').textContent = `${sheetData[0].rows.length} rows detected`;
     };
     reader.readAsText(file);
-
-  } else if (ext === 'xlsx' || ext === 'xls') {
+  } else if (ext==='xlsx'||ext==='xls') {
     reader.onload = e => {
-      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const wb = XLSX.read(e.target.result, {type:'array'});
       sheetData = [];
       wb.SheetNames.forEach(name => {
         const ws = wb.Sheets[name];
-        const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-        if (data.length < 2) return; // skip empty sheets
-        const headers = data[0].map(String);
-        const rows = data.slice(1).filter(r => r.some(c => String(c).trim()));
-        if (rows.length) sheetData.push({ sheetName: name, headers, rows, selectedCol: 0, enabled: true });
+        const data = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+        if (data.length < 2) return;
+        const rows = data.slice(1).filter(r=>r.some(c=>String(c).trim()));
+        if (rows.length) sheetData.push({ sheetName: name, headers: data[0].map(String), rows, selectedCol: 0, enabled: true });
       });
-      if (!sheetData.length) { alert('No usable sheets found in this file.'); return; }
-      const totalRows = sheetData.reduce((s, d) => s + d.rows.length, 0);
-      document.getElementById('file-meta').textContent = `${sheetData.length} sheet${sheetData.length > 1 ? 's' : ''}, ${totalRows} rows total`;
-      renderSheetPicker();
+      if (!sheetData.length) { alert('No usable sheets found.'); return; }
+      const total = sheetData.reduce((s,d)=>s+d.rows.length,0);
+      document.getElementById('file-meta').textContent = `${sheetData.length} sheet${sheetData.length>1?'s':''}, ${total} rows total`;
+      showSheetPicker();
     };
     reader.readAsArrayBuffer(file);
-
   } else {
     alert('Unsupported file type. Please use CSV, XLSX, XLS, or TXT.');
   }
 }
 
-function renderSheetPicker() {
+function showSheetPicker() {
   const picker = document.getElementById('sheet-picker');
   const list = document.getElementById('sheet-list');
   picker.classList.add('visible');
   list.innerHTML = '';
-
   sheetData.forEach((sheet, si) => {
     const row = document.createElement('div');
     row.className = 'sheet-row expanded';
     row.id = `sheet-row-${si}`;
-
-    const colOptions = sheet.headers.map((h, ci) =>
-      `<option value="${ci}">${esc(h) || 'Column ' + (ci + 1)}</option>`
-    ).join('');
-
-    const samples = sheet.rows.slice(0, 3).map(r => String(r[sheet.selectedCol] || '').trim()).filter(Boolean);
-    const preview = samples.length ? 'e.g. ' + samples.join(', ') + (sheet.rows.length > 3 ? '…' : '') : 'No values';
-
+    const colOptions = sheet.headers.map((h,ci)=>`<option value="${ci}">${esc(h)||'Column '+(ci+1)}</option>`).join('');
+    const samples = sheet.rows.slice(0,3).map(r=>String(r[sheet.selectedCol]||'').trim()).filter(Boolean);
+    const preview = samples.length ? 'e.g. '+samples.join(', ')+(sheet.rows.length>3?'…':'') : 'No values';
     row.innerHTML = `
       <div class="sheet-row-top">
-        <input type="checkbox" class="sheet-checkbox" id="sheet-cb-${si}" ${sheet.enabled ? 'checked' : ''} data-sheet-index="${si}" />
+        <input type="checkbox" class="sheet-checkbox" id="sheet-cb-${si}" ${sheet.enabled?'checked':''} data-sheet-index="${si}" />
         <label class="sheet-name" for="sheet-cb-${si}">${esc(sheet.sheetName)}</label>
         <span class="sheet-row-count">${sheet.rows.length} rows</span>
       </div>
       <div class="sheet-col-wrap">
         <div class="sheet-col-label">Which column contains the place names?</div>
-        <select class="sheet-col-select" id="sheet-col-${si}" data-sheet-index="${si}">
-          ${colOptions}
-        </select>
+        <select class="sheet-col-select" id="sheet-col-${si}" data-sheet-index="${si}">${colOptions}</select>
         <div class="sheet-col-preview" id="sheet-preview-${si}">${esc(preview)}</div>
       </div>`;
     list.appendChild(row);
-
-    // Checkbox toggle
     row.querySelector('.sheet-checkbox').addEventListener('change', function() {
       sheetData[si].enabled = this.checked;
       row.classList.toggle('expanded', this.checked);
       updateSheetTotal();
     });
-
-    // Column select change
     row.querySelector('.sheet-col-select').addEventListener('change', function() {
       sheetData[si].selectedCol = parseInt(this.value);
-      const s = sheetData[si].rows.slice(0, 3).map(r => String(r[sheetData[si].selectedCol] || '').trim()).filter(Boolean);
-      document.getElementById(`sheet-preview-${si}`).textContent = s.length ? 'e.g. ' + s.join(', ') + (sheetData[si].rows.length > 3 ? '…' : '') : 'No values';
+      const s = sheetData[si].rows.slice(0,3).map(r=>String(r[sheetData[si].selectedCol]||'').trim()).filter(Boolean);
+      document.getElementById(`sheet-preview-${si}`).textContent = s.length ? 'e.g. '+s.join(', ')+(sheetData[si].rows.length>3?'…':'') : 'No values';
       updateSheetTotal();
     });
   });
-
   updateSheetTotal();
 }
 
+function hideSheetPicker() { document.getElementById('sheet-picker').classList.remove('visible'); }
+
 function updateSheetTotal() {
-  const enabled = sheetData.filter(s => s.enabled);
-  const total = enabled.reduce((sum, s) => {
-    return sum + s.rows.map(r => String(r[s.selectedCol] || '').trim()).filter(Boolean).length;
-  }, 0);
+  const enabled = sheetData.filter(s=>s.enabled);
+  const total = enabled.reduce((sum,s) => sum + s.rows.map(r=>String(r[s.selectedCol]||'').trim()).filter(Boolean).length, 0);
   const el = document.getElementById('sheet-total');
   if (sheetData.length > 1) {
     el.textContent = `${enabled.length} of ${sheetData.length} sheets selected — ${total} places total`;
@@ -993,45 +911,38 @@ function updateSheetTotal() {
   }
 }
 
-// ── Batch generate ────────────────────────────────────────────────────────
+// ── Batch generate ────────────────────────────────────────────────────────────
 async function generateBatch() {
   if (!sheetData.length) { alert('Please upload a file first.'); return; }
-
-  // Collect all places from all enabled sheets
   const allPlaces = [];
-  sheetData.filter(s => s.enabled).forEach(sheet => {
+  sheetData.filter(s=>s.enabled).forEach(sheet => {
     sheet.rows.forEach(r => {
-      const val = String(r[sheet.selectedCol] || '').trim();
+      const val = String(r[sheet.selectedCol]||'').trim();
       if (val) allPlaces.push({ place: val, sheet: sheet.sheetName });
     });
   });
-
   if (!allPlaces.length) { alert('No place names found in the selected sheets/columns.'); return; }
 
   const btn = document.getElementById('btn-batch');
   btn.disabled = true; btn.textContent = 'Generating…';
-  batchResults = allPlaces.map(p => ({ place: p.place, sheet: p.sheet, facts: null, selected: null, error: null }));
+  batchResults = allPlaces.map(p=>({ place: p.place, sheet: p.sheet, fact: null, sources: null, error: null }));
 
-  const pw = document.getElementById('progress-wrap');
-  const pb = document.getElementById('progress-bar');
-  const pl = document.getElementById('progress-label');
-  const pc = document.getElementById('progress-count');
+  const pw=document.getElementById('progress-wrap'), pb=document.getElementById('progress-bar');
+  const pl=document.getElementById('progress-label'), pc=document.getElementById('progress-count');
   pw.classList.add('visible');
   const container = document.getElementById('results-batch');
   container.innerHTML = '';
   document.getElementById('export-bar').classList.remove('visible');
 
-  // Group results by sheet visually if more than one sheet
-  const multiSheet = sheetData.filter(s => s.enabled).length > 1;
+  const multiSheet = sheetData.filter(s=>s.enabled).length > 1;
   let currentSheet = null;
 
-  for (let i = 0; i < allPlaces.length; i++) {
+  for (let i=0; i<allPlaces.length; i++) {
     const { place, sheet } = allPlaces[i];
-    pl.textContent = `Generating facts for ${place}…`;
+    pl.textContent = `Processing ${place}…`;
     pc.textContent = `${i} / ${allPlaces.length}`;
-    pb.style.width = `${(i / allPlaces.length) * 100}%`;
+    pb.style.width = `${(i/allPlaces.length)*100}%`;
 
-    // Add sheet heading when it changes (multi-sheet mode)
     if (multiSheet && sheet !== currentSheet) {
       currentSheet = sheet;
       const heading = document.createElement('div');
@@ -1043,57 +954,66 @@ async function generateBatch() {
     const group = document.createElement('div');
     group.className = 'place-group'; group.id = `group-${i}`;
     group.innerHTML = `
-      <div class="place-heading">
-        <div class="place-num">${i + 1}</div>
-        <span>${esc(place)}</span>
-      </div>
-      <div class="loading" style="padding:1rem 0;font-size:13px">Generating${dots()}</div>`;
+      <div class="place-heading"><div class="place-num">${i+1}</div><span>${esc(place)}</span></div>
+      <div class="loading" id="group-loading-${i}" style="padding:1rem 0;font-size:13px">
+        Generating &amp; verifying${dots()}
+        <div class="loading-step" id="group-step-${i}"></div>
+      </div>`;
     container.appendChild(group);
-    group.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    group.scrollIntoView({ behavior:'smooth', block:'nearest' });
 
     try {
-      const raw = await callClaude(factPrompt(place));
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed.facts) || parsed.facts.length < 3) throw new Error('Unexpected response');
-      const facts = parsed.facts.slice(0, 3);
-      batchResults[i].facts = facts;
-      const cardsDiv = document.createElement('div');
-      renderFactCards(cardsDiv, facts, `b${i}`, place);
-      group.querySelector('.loading').replaceWith(cardsDiv);
-      dbAddEntry(place, facts);
+      const result = await generateAndVerify(place, (msg, attempt) => {
+        const el = document.getElementById(`group-loading-${i}`);
+        const step = document.getElementById(`group-step-${i}`);
+        if (el) el.innerHTML = `${esc(msg)}${dots()}<div class="loading-step">${attempt>1?'Attempt '+attempt+' of '+MAX_RETRIES:''}</div>`;
+      });
+
+      batchResults[i].fact = result.fact;
+      batchResults[i].sources = result.sources;
+
+      const factDiv = document.createElement('div');
+      renderFactCard(factDiv, place, result, `b${i}`);
+      group.querySelector(`#group-loading-${i}`).replaceWith(factDiv.firstChild);
+      dbAddEntry(place, result.fact, result.sources);
+
     } catch(e) {
       batchResults[i].error = e.message;
       const errDiv = document.createElement('div');
       errDiv.style.cssText = 'font-size:13px;color:#c00;padding:8px 0';
-      errDiv.textContent = `Error: ${e.message}`;
-      group.querySelector('.loading').replaceWith(errDiv);
+      errDiv.innerHTML = `<strong>Could not verify a fact for this place.</strong><br><span style="color:#aaa">${esc(e.message)}</span>`;
+      group.querySelector(`#group-loading-${i}`).replaceWith(errDiv);
     }
-    if (i < allPlaces.length - 1) await sleep(400);
+    if (i < allPlaces.length-1) await sleep(600);
   }
 
   pl.textContent = 'All done!';
   pc.textContent = `${allPlaces.length} / ${allPlaces.length}`;
   pb.style.width = '100%';
-  btn.disabled = false; btn.textContent = 'Generate facts for all places';
+  btn.disabled = false; btn.textContent = 'Generate verified facts for all places';
   document.getElementById('export-bar').classList.add('visible');
   updateBadge();
 }
 
 function exportBatchCSV() {
-  const rows = [['Place', 'Sheet', 'Selected fact', 'Fact 1 (historical)', 'Fact 2 (geographical)', 'Fact 3 (cultural)']];
-  batchResults.forEach(r => { if (r.facts) rows.push([r.place, r.sheet || '', r.selected || '', ...r.facts]); });
-  downloadCSV(rows, 'facts-batch-export.csv');
+  const rows = [['Place', 'Sheet', 'Verified Historical Fact', 'Char Count', 'Source 1', 'Source 2', 'Source 3']];
+  batchResults.forEach(r => {
+    if (!r.fact) return;
+    const srcs = (r.sources||[]).map(s=>s.label+': '+s.url);
+    rows.push([r.place, r.sheet||'', r.fact, r.fact.length, srcs[0]||'', srcs[1]||'', srcs[2]||'']);
+  });
+  downloadCSV(rows, 'facts-export.csv');
 }
 
-// ── History ───────────────────────────────────────────────────────────────
+// ── History ────────────────────────────────────────────────────────────────────
 function renderHistory() {
   const q = document.getElementById('db-search').value.trim().toLowerCase();
   const records = dbLoad().filter(r => !q || r.place.toLowerCase().includes(q));
   const list = document.getElementById('db-list');
-  document.getElementById('db-count').textContent = records.length ? `${records.length} entr${records.length === 1 ? 'y' : 'ies'}` : '';
+  document.getElementById('db-count').textContent = records.length ? `${records.length} entr${records.length===1?'y':'ies'}` : '';
 
   if (!records.length) {
-    list.innerHTML = `<div class="db-empty"><strong>${q ? 'No results' : 'No history yet'}</strong><p>${q ? 'Try a different search.' : 'Generate facts for a place and they\'ll appear here.'}</p></div>`;
+    list.innerHTML = `<div class="db-empty"><strong>${q?'No results':'No history yet'}</strong><p>${q?'Try a different search.':'Generate a fact for a place and it\'ll appear here.'}</p></div>`;
     return;
   }
 
@@ -1102,22 +1022,21 @@ function renderHistory() {
     const item = document.createElement('div');
     item.className = 'db-item'; item.id = `db-${r.id}`;
 
-    const factsHtml = (r.facts || []).map((f, i) => `
-      <div class="db-fact-row">
-        <div class="db-fact-lbl">${LABELS[i].split(' ')[0]}</div>
-        <div class="db-fact-text ${r.selected === f ? 'db-fact-selected' : ''}">${esc(f)}${r.selected === f ? ' ★' : ''}</div>
-        <button class="db-fact-copy" data-action="db-copy" data-text="${esc(f)}">Copy</button>
-      </div>`).join('');
+    const sourcesHtml = (r.sources||[]).map(s =>
+      `<a href="${esc(s.url)}" target="_blank" rel="noopener" style="color:#1557c0;text-decoration:none">${esc(s.label)}</a>`
+    ).join(' · ');
 
     item.innerHTML = `
       <div class="db-item-header" data-action="db-toggle" data-id="${r.id}">
         <div class="db-place-name">${esc(r.place)}</div>
-        ${r.selected ? '<span class="db-selected-pill">★ selected</span>' : ''}
+        <span class="db-verified-pill">✓ verified</span>
         <div class="db-date">${fmtDate(r.date)}</div>
         <div class="db-chevron">▾</div>
       </div>
       <div class="db-item-body">
-        ${factsHtml}
+        <div class="db-fact-text">${esc(r.fact||'')}</div>
+        <div class="db-sources"><strong>Verified via:</strong> ${sourcesHtml||'—'}</div>
+        <button class="db-fact-copy" data-action="db-copy" data-text="${esc(r.fact||'')}">Copy fact</button>
         <span class="db-item-delete" data-action="db-delete" data-id="${r.id}">Delete entry</span>
       </div>`;
     list.appendChild(item);
@@ -1126,24 +1045,25 @@ function renderHistory() {
 
 function clearHistory() {
   if (!confirm('Clear all history? This cannot be undone.')) return;
-  localStorage.removeItem(DB_KEY);
-  updateBadge(); renderHistory();
+  localStorage.removeItem(DB_KEY); updateBadge(); renderHistory();
 }
 
 function exportHistoryCSV() {
   const records = dbLoad();
   if (!records.length) { alert('No history to export.'); return; }
-  const rows = [['Place', 'Date', 'Selected fact', 'Fact 1', 'Fact 2', 'Fact 3']];
-  records.forEach(r => rows.push([r.place, fmtDate(r.date), r.selected || '', ...(r.facts || [])]));
+  const rows = [['Place','Date','Verified Historical Fact','Char Count','Source 1','Source 2','Source 3']];
+  records.forEach(r => {
+    const srcs = (r.sources||[]).map(s=>s.label+': '+s.url);
+    rows.push([r.place, fmtDate(r.date), r.fact||'', (r.fact||'').length, srcs[0]||'', srcs[1]||'', srcs[2]||'']);
+  });
   downloadCSV(rows, 'facts-history-export.csv');
 }
 
-// ── CSV util ──────────────────────────────────────────────────────────────
 function downloadCSV(rows, filename) {
-  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-  const blob = new Blob([csv], { type: 'text/csv' });
+  const csv = rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv],{type:'text/csv'});
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+  const a = document.createElement('a'); a.href=url; a.download=filename; a.click();
   URL.revokeObjectURL(url);
 }
 </script>
