@@ -208,6 +208,12 @@
     .db-export-btn { font-size: 12px; padding: 7px 14px; border: 1px solid #ddd; border-radius: 8px; background: #fff; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; }
     .db-export-btn:hover { background: #f5f5f5; }
     .db-count { font-size: 12px; color: #aaa; white-space: nowrap; }
+    .db-session-group { margin-bottom: 1.75rem; }
+    .db-session-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #ececec; flex-wrap: wrap; }
+    .db-session-label { font-size: 12px; font-weight: 600; color: #555; flex: 1; min-width: 0; }
+    .db-session-count { font-size: 11px; color: #bbb; white-space: nowrap; }
+    .db-session-export { font-size: 11px; padding: 4px 12px; border: 1px solid #ddd; border-radius: 8px; background: #fff; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; color: #555; }
+    .db-session-export:hover { background: #f5f5f5; }
     .db-empty { text-align: center; padding: 4rem 0; color: #bbb; font-size: 14px; }
     .db-empty p { margin-top: 8px; font-size: 12px; color: #ccc; }
     .db-list { display: flex; flex-direction: column; gap: 10px; }
@@ -416,6 +422,7 @@ function getStored(id) { return FACT_STORE[id] || null; }
 
 // ── State ────────────────────────────────────────────────────────────────────
 let SESSION_KEY = '';
+let CURRENT_SESSION_ID = '';
 let batchResults = [];
 let sheetData = [];
 
@@ -528,10 +535,10 @@ function signOut() {
 // ── DB ────────────────────────────────────────────────────────────────────────
 function dbLoad() { try { return JSON.parse(localStorage.getItem(DB_KEY)||'[]'); } catch(e) { return []; } }
 function dbSave(r) { localStorage.setItem(DB_KEY, JSON.stringify(r)); updateBadge(); }
-function dbAddEntry(place, fact, sources) {
+function dbAddEntry(place, fact, sources, sessionId) {
   const records = dbLoad();
-  const existing = records.findIndex(r => r.place.toLowerCase() === place.toLowerCase());
-  const entry = { id: existing>=0 ? records[existing].id : Date.now()+Math.random(), place, fact, sources, date: new Date().toISOString() };
+  const existing = records.findIndex(r => r.place.toLowerCase() === place.toLowerCase() && r.sessionId === sessionId);
+  const entry = { id: existing>=0 ? records[existing].id : Date.now()+Math.random(), place, fact, sources, sessionId: sessionId||'', date: new Date().toISOString() };
   if (existing>=0) records[existing] = entry; else records.unshift(entry);
   dbSave(records);
 }
@@ -757,6 +764,10 @@ function handleCardClick(e) {
     copyToClipboard(stored.fact, btn);
   }
 
+  if (action === 'db-export-session') {
+    exportSessionCSV(btn.dataset.sessionId, btn.dataset.sessionDate);
+  }
+
   if (action === 'db-copy') {
     copyToClipboard(btn.dataset.text, btn);
   }
@@ -785,6 +796,9 @@ async function generateSingle() {
   const q = document.getElementById('q').value.trim();
   if (!q) return;
 
+  // New session ID for this run
+  CURRENT_SESSION_ID = 'session_' + Date.now();
+
   const btn = document.getElementById('btn-single');
   btn.disabled = true; btn.textContent = '…';
 
@@ -803,7 +817,7 @@ async function generateSingle() {
     });
 
     renderFactCard(results, q, result, 's');
-    dbAddEntry(q, result.fact, result.sources);
+    dbAddEntry(q, result.fact, result.sources, CURRENT_SESSION_ID);
 
   } catch(e) {
     results.innerHTML = `<div class="error-msg">
@@ -946,6 +960,9 @@ async function generateBatch() {
   });
   if (!allPlaces.length) { alert('No place names found in the selected sheets/columns.'); return; }
 
+  // New session ID shared by every entry in this batch run
+  CURRENT_SESSION_ID = 'session_' + Date.now();
+
   const btn = document.getElementById('btn-batch');
   btn.disabled = true; btn.textContent = 'Generating…';
   batchResults = allPlaces.map(p=>({ place: p.place, sheet: p.sheet, row: p.row, headers: p.headers, selectedCol: p.selectedCol, fact: null, sources: null, error: null }));
@@ -998,7 +1015,7 @@ async function generateBatch() {
       const factDiv = document.createElement('div');
       renderFactCard(factDiv, place, result, `b${i}`);
       group.querySelector(`#group-loading-${i}`).replaceWith(factDiv.firstChild);
-      dbAddEntry(place, result.fact, result.sources);
+      dbAddEntry(place, result.fact, result.sources, CURRENT_SESSION_ID);
 
     } catch(e) {
       batchResults[i].error = e.message;
@@ -1069,7 +1086,8 @@ function exportBatchCSV() {
 // ── History ────────────────────────────────────────────────────────────────────
 function renderHistory() {
   const q = document.getElementById('db-search').value.trim().toLowerCase();
-  const records = dbLoad().filter(r => !q || r.place.toLowerCase().includes(q));
+  const allRecords = dbLoad();
+  const records = allRecords.filter(r => !q || r.place.toLowerCase().includes(q));
   const list = document.getElementById('db-list');
   document.getElementById('db-count').textContent = records.length ? `${records.length} entr${records.length===1?'y':'ies'}` : '';
 
@@ -1078,62 +1096,98 @@ function renderHistory() {
     return;
   }
 
-  list.innerHTML = '';
+  // Group records by sessionId, preserving order (most recent session first)
+  const sessionMap = new Map(); // sessionId -> {records, date}
   records.forEach(r => {
-    const item = document.createElement('div');
-    item.className = 'db-item'; item.id = `db-${r.id}`;
+    const sid = r.sessionId || 'legacy';
+    if (!sessionMap.has(sid)) sessionMap.set(sid, { records: [], date: r.date });
+    sessionMap.get(sid).records.push(r);
+  });
 
-    // Build the inline sources panel from stored source objects
-    const sources = r.sources || [];
-    const hasSources = sources.length > 0;
+  list.innerHTML = '';
 
-    const sourceLinksHtml = sources.map((s, j) => {
-      const bg    = ICON_BG[j]     || '#f0f0f0';
-      const color = ICON_COLOR[j]  || '#555';
-      const letter= ICON_LETTER[j] || '?';
-      const shortQ = (s.q||s.url||'').length > 60 ? (s.q||s.url||'').substring(0,60)+'…' : (s.q||s.url||'');
-      return `<a class="source-link" href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">
-        <div class="source-icon" style="background:${bg};color:${color}">${letter}</div>
-        <div class="source-info">
-          <div class="source-title">${esc(s.label)}</div>
-          <div class="source-desc">${esc(shortQ)}</div>
-        </div>
-        <span class="source-arrow">→</span>
-      </a>`;
-    }).join('');
+  sessionMap.forEach((group, sid) => {
+    const sessionGroup = document.createElement('div');
+    sessionGroup.className = 'db-session-group';
 
-    const verifyBtnHtml = hasSources
-      ? `<button class="db-verify-btn" data-action="db-toggle-sources" data-id="${r.id}">
-          <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.3"/><path d="M5 8.5l2 2 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          View sources
-        </button>`
-      : '';
+    // Session label — use timestamp from first entry in group
+    const sessionDate = group.date;
+    const labelText = sid === 'legacy'
+      ? 'Earlier entries (pre-session tracking)'
+      : `Session — ${fmtDate(sessionDate)}`;
+    const countText = `${group.records.length} entr${group.records.length===1?'y':'ies'}`;
 
-    const sourcesPanelHtml = hasSources
-      ? `<div class="db-history-sources" id="db-sources-${r.id}">
-          <div class="sources-heading">Sources used to verify this fact</div>
-          <div class="source-links">${sourceLinksHtml}</div>
-          <p class="sources-note">Each link opens a targeted Google search for the key claim in this fact. The fact was automatically verified against these sources when it was generated.</p>
-        </div>`
-      : '';
+    const exportIcon = `<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 2v9M4 8l4 4 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 13h12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>`;
 
-    item.innerHTML = `
-      <div class="db-item-header" data-action="db-toggle" data-id="${r.id}">
-        <div class="db-place-name">${esc(r.place)}</div>
-        <span class="db-verified-pill">✓ verified</span>
-        <div class="db-date">${fmtDate(r.date)}</div>
-        <div class="db-chevron">▾</div>
+    sessionGroup.innerHTML = `
+      <div class="db-session-header">
+        <div class="db-session-label">${esc(labelText)}</div>
+        <span class="db-session-count">${countText}</span>
+        <button class="db-session-export" data-action="db-export-session" data-session-id="${esc(sid)}" data-session-date="${esc(sessionDate)}">
+          ${exportIcon} Export this session
+        </button>
       </div>
-      <div class="db-item-body">
-        <div class="db-fact-text">${esc(r.fact||'')}</div>
-        <div class="db-actions">
-          ${verifyBtnHtml}
-          <button class="db-fact-copy" data-action="db-copy" data-text="${esc(r.fact||'')}">Copy fact</button>
-          <span class="db-item-delete" data-action="db-delete" data-id="${r.id}">Delete entry</span>
+      <div class="db-list db-session-items" id="session-items-${esc(sid)}"></div>`;
+
+    list.appendChild(sessionGroup);
+
+    const itemsContainer = document.getElementById(`session-items-${sid}`);
+
+    group.records.forEach(r => {
+      const item = document.createElement('div');
+      item.className = 'db-item'; item.id = `db-${r.id}`;
+
+      const sources = r.sources || [];
+      const hasSources = sources.length > 0;
+
+      const sourceLinksHtml = sources.map((s, j) => {
+        const bg     = ICON_BG[j]     || '#f0f0f0';
+        const color  = ICON_COLOR[j]  || '#555';
+        const letter = ICON_LETTER[j] || '?';
+        const shortQ = (s.q||s.url||'').length > 60 ? (s.q||s.url||'').substring(0,60)+'…' : (s.q||s.url||'');
+        return `<a class="source-link" href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">
+          <div class="source-icon" style="background:${bg};color:${color}">${letter}</div>
+          <div class="source-info">
+            <div class="source-title">${esc(s.label)}</div>
+            <div class="source-desc">${esc(shortQ)}</div>
+          </div>
+          <span class="source-arrow">→</span>
+        </a>`;
+      }).join('');
+
+      const verifyBtnHtml = hasSources
+        ? `<button class="db-verify-btn" data-action="db-toggle-sources" data-id="${r.id}">
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.3"/><path d="M5 8.5l2 2 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            View sources
+          </button>`
+        : '';
+
+      const sourcesPanelHtml = hasSources
+        ? `<div class="db-history-sources" id="db-sources-${r.id}">
+            <div class="sources-heading">Sources used to verify this fact</div>
+            <div class="source-links">${sourceLinksHtml}</div>
+            <p class="sources-note">Each link opens a targeted Google search for the key claim in this fact. The fact was automatically verified against these sources when it was generated.</p>
+          </div>`
+        : '';
+
+      item.innerHTML = `
+        <div class="db-item-header" data-action="db-toggle" data-id="${r.id}">
+          <div class="db-place-name">${esc(r.place)}</div>
+          <span class="db-verified-pill">✓ verified</span>
+          <div class="db-date">${fmtDate(r.date)}</div>
+          <div class="db-chevron">▾</div>
         </div>
-        ${sourcesPanelHtml}
-      </div>`;
-    list.appendChild(item);
+        <div class="db-item-body">
+          <div class="db-fact-text">${esc(r.fact||'')}</div>
+          <div class="db-actions">
+            ${verifyBtnHtml}
+            <button class="db-fact-copy" data-action="db-copy" data-text="${esc(r.fact||'')}">Copy fact</button>
+            <span class="db-item-delete" data-action="db-delete" data-id="${r.id}">Delete entry</span>
+          </div>
+          ${sourcesPanelHtml}
+        </div>`;
+      itemsContainer.appendChild(item);
+    });
   });
 }
 
@@ -1142,15 +1196,29 @@ function clearHistory() {
   localStorage.removeItem(DB_KEY); updateBadge(); renderHistory();
 }
 
+function exportSessionCSV(sessionId, sessionDate) {
+  const records = dbLoad().filter(r => (r.sessionId || 'legacy') === sessionId);
+  if (!records.length) { alert('No entries found for this session.'); return; }
+  const rows = [['Place', 'Date', 'Verified Historical Fact', 'Char Count', 'Status', 'Source 1', 'Source 2', 'Source 3']];
+  records.forEach(r => {
+    const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
+    rows.push([r.place, fmtDate(r.date), r.fact||'', (r.fact||'').length, r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
+  });
+  // Label filename with session datetime
+  const dateSlug = sessionDate ? new Date(sessionDate).toISOString().replace(/[:.]/g,'-').substring(0,19) : 'session';
+  downloadCSV(rows, `facts-session-${dateSlug}.csv`);
+}
+
 function exportHistoryCSV() {
   const records = dbLoad();
   if (!records.length) { alert('No history to export.'); return; }
-  const rows = [['Place','Date','Verified Historical Fact','Char Count','Source 1','Source 2','Source 3']];
+  const rows = [['Place', 'Session', 'Date', 'Verified Historical Fact', 'Char Count', 'Status', 'Source 1', 'Source 2', 'Source 3']];
   records.forEach(r => {
-    const srcs = (r.sources||[]).map(s=>s.label+': '+s.url);
-    rows.push([r.place, fmtDate(r.date), r.fact||'', (r.fact||'').length, srcs[0]||'', srcs[1]||'', srcs[2]||'']);
+    const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
+    const sessionLabel = r.sessionId ? fmtDate(new Date(parseInt(r.sessionId.replace('session_',''))).toISOString()) : 'Legacy';
+    rows.push([r.place, sessionLabel, fmtDate(r.date), r.fact||'', (r.fact||'').length, r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
   });
-  downloadCSV(rows, 'facts-history-export.csv');
+  downloadCSV(rows, 'facts-history-all.csv');
 }
 
 function downloadCSV(rows, filename) {
