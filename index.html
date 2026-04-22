@@ -935,14 +935,20 @@ async function generateBatch() {
   sheetData.filter(s=>s.enabled).forEach(sheet => {
     sheet.rows.forEach(r => {
       const val = String(r[sheet.selectedCol]||'').trim();
-      if (val) allPlaces.push({ place: val, sheet: sheet.sheetName });
+      if (val) allPlaces.push({
+        place: val,
+        sheet: sheet.sheetName,
+        row: r,                    // full original row
+        headers: sheet.headers,    // column headers for that sheet
+        selectedCol: sheet.selectedCol
+      });
     });
   });
   if (!allPlaces.length) { alert('No place names found in the selected sheets/columns.'); return; }
 
   const btn = document.getElementById('btn-batch');
   btn.disabled = true; btn.textContent = 'Generating…';
-  batchResults = allPlaces.map(p=>({ place: p.place, sheet: p.sheet, fact: null, sources: null, error: null }));
+  batchResults = allPlaces.map(p=>({ place: p.place, sheet: p.sheet, row: p.row, headers: p.headers, selectedCol: p.selectedCol, fact: null, sources: null, error: null }));
 
   const pw=document.getElementById('progress-wrap'), pb=document.getElementById('progress-bar');
   const pl=document.getElementById('progress-label'), pc=document.getElementById('progress-count');
@@ -1013,15 +1019,50 @@ async function generateBatch() {
 }
 
 function exportBatchCSV() {
-  const rows = [['Place', 'Sheet', 'Verified Historical Fact', 'Char Count', 'Status', 'Failure Reason', 'Source 1', 'Source 2', 'Source 3']];
-  batchResults.forEach(r => {
+  if (!batchResults.length) return;
+
+  // Collect all unique original headers across all sheets in order of appearance,
+  // excluding the place-name column itself (we already have it as 'Place')
+  const seenHeaders = [];
+  const extraColsByResult = batchResults.map(r => {
+    const extras = {};
+    if (r.headers && r.row) {
+      r.headers.forEach((h, ci) => {
+        if (ci === r.selectedCol) return; // skip the place column — already included
+        const label = h || `Column ${ci + 1}`;
+        if (!seenHeaders.includes(label)) seenHeaders.push(label);
+        extras[label] = String(r.row[ci] || '');
+      });
+    }
+    return extras;
+  });
+
+  // Build header row: original extra columns first, then our generated columns
+  const headerRow = [
+    'Place',
+    'Sheet',
+    ...seenHeaders,
+    'Verified Historical Fact',
+    'Char Count',
+    'Status',
+    'Failure Reason',
+    'Source 1',
+    'Source 2',
+    'Source 3'
+  ];
+
+  const rows = [headerRow];
+
+  batchResults.forEach((r, i) => {
+    const extras = seenHeaders.map(h => extraColsByResult[i][h] || '');
     if (r.fact) {
-      const srcs = (r.sources||[]).map(s=>s.label+': '+s.url);
-      rows.push([r.place, r.sheet||'', r.fact, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
+      const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
+      rows.push([r.place, r.sheet||'', ...extras, r.fact, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
     } else {
-      rows.push([r.place, r.sheet||'', '', '', 'Failed', r.error||'Could not produce a verified fact after 3 attempts', '', '', '']);
+      rows.push([r.place, r.sheet||'', ...extras, '', '', 'Failed', r.error||'Could not produce a verified fact after 3 attempts', '', '', '']);
     }
   });
+
   downloadCSV(rows, 'facts-export.csv');
 }
 
