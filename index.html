@@ -1,4 +1,4 @@
-   <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -596,7 +596,7 @@ async function generateCandidateFact(place, lastError = '') {
 
   const raw = await callClaude(`You are a writer creating stamp descriptions for a passport collectible app. Each description covers a real place and follows a strict two-part hybrid format:
 
-PART 1 — A surprising, specific, true detail about the place. Something that makes a well-travelled person think "I didn't know that." It must be a real, verifiable fact — not a vague generalisation.
+PART 1 — A surprising, specific, true detail about the place. Something that makes a well-travelled person picture it, feel its scale, or understand its character. It must be a real, verifiable fact — not a vague generalisation.
 PART 2 — A short closing phrase (max 10 words) that lands the detail with a sense of place or scale. It must be SPECIFIC to this place — never generic filler.
 
 The two parts form a single flowing sentence, 140–260 characters total.
@@ -607,7 +607,24 @@ GOOD examples of the hybrid format:
 - "Built at four and a half floors per week and finished 45 days ahead of schedule during the Great Depression, the Empire State Building rose faster than New York itself expected."
 - "The Eiffel Tower grows up to 15cm taller in summer as its iron expands in the heat — a tower that literally changes with the seasons."
 - "Machu Picchu was built without mortar, its stones fitted so precisely that a knife blade cannot pass between them — and it has held for 600 years."
-- "Iceland has no standing army and has never fought a war in the modern era, yet sits on one of the world's most active volcanic hotspots."
+- "Portuguese explorers charted more of the world's coastline in the 15th century than any other nation, opening sea routes to Africa, India and Brazil within a single generation."
+- "More than a third of the Amazon rainforest lies within Brazil's borders — an area larger than the entire continent of Europe."
+
+BANNED fact categories — never use facts from these areas, no matter how surprising:
+- Politics, elections, voting systems or political parties
+- Laws, legislation, legal rulings or criminal justice policy
+- Drug policy, healthcare policy or social welfare programmes
+- Military spending, defence policy or treaties
+- Economic policy, tax systems or trade agreements
+- Immigration or citizenship rules
+
+INSTEAD, always draw from these categories:
+- Geography: size, position, borders, terrain, coastline, elevation, rivers, islands
+- Natural world: climate records, wildlife, geology, ecosystems, natural phenomena
+- Architecture and engineering: construction records, materials, scale, structural facts
+- History of exploration, trade or empire: routes, discoveries, expeditions
+- Cultural output: language reach, UNESCO sites, ancient civilisations, historic firsts
+- Physical records: oldest, largest, deepest, highest, longest — specific and measurable
 
 BANNED closing phrases — never use these or anything like them:
 - "...and it has defined the skyline ever since"
@@ -620,7 +637,7 @@ BANNED closing phrases — never use these or anything like them:
 - Any closing that could apply to more than 10 places on earth
 
 Place type guidance:
-- COUNTRY: use a surprising geographic, cultural or political detail — population, size, record, quirk
+- COUNTRY: use a geographic, natural, exploratory or cultural record — never a policy or political fact
 - CITY: use a founding story, an urban record, a surprising structural or geographic fact
 - STREET or AVENUE: a famous event, a record, something unexpected about its scale or history
 - BUILDING or LANDMARK: construction, engineering, or record-breaking detail
