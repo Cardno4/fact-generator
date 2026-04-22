@@ -352,7 +352,7 @@
         </div>
         <div class="upload-title">Drop your file here, or click to browse</div>
         <div class="upload-sub">CSV, Excel (.xlsx / .xls), or plain text (.txt)</div>
-        <div class="upload-hint">One place per row. For Excel files with multiple sheets, choose which sheets and columns to include.</div>
+        <div class="upload-hint">One place per row. For multi-tab files, upload as <strong>.xlsx</strong> — CSV only supports a single sheet. Excel files let you choose which tabs and columns to include.</div>
       </div>
       <div class="file-preview" id="file-preview">
         <div class="file-icon" id="file-icon">CSV</div>
@@ -875,6 +875,15 @@ function clearFile() {
 }
 
 function processFile(file) {
+  // Always reset state before processing a new file
+  sheetData = [];
+  document.getElementById('sheet-picker').classList.remove('visible');
+  document.getElementById('sheet-list').innerHTML = '';
+  document.getElementById('sheet-total').textContent = '';
+  document.getElementById('results-batch').innerHTML = '';
+  document.getElementById('export-bar').classList.remove('visible');
+  document.getElementById('progress-wrap').classList.remove('visible');
+
   const ext = file.name.split('.').pop().toLowerCase();
   const iconEl = document.getElementById('file-icon');
   iconEl.textContent = ext.toUpperCase();
@@ -892,12 +901,11 @@ function processFile(file) {
       const cols = lines[0].split(',').map(c=>c.replace(/^"|"$/g,'').trim());
       if (cols.length > 1) {
         sheetData = [{ sheetName: file.name, headers: cols, rows: lines.slice(1).map(l=>l.split(',').map(c=>c.replace(/^"|"$/g,'').trim())), selectedCol: 0, enabled: true }];
-        showSheetPicker();
       } else {
         sheetData = [{ sheetName: file.name, headers: ['Place'], rows: lines.map(l=>[l]), selectedCol: 0, enabled: true }];
-        hideSheetPicker();
       }
       document.getElementById('file-meta').textContent = `${sheetData[0].rows.length} rows detected`;
+      showSheetPicker();
     };
     reader.readAsText(file);
   } else if (ext==='xlsx'||ext==='xls') {
