@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+   <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -289,7 +289,7 @@
   <div class="topbar">
     <div class="topbar-left">
       <h1>Fact Generator</h1>
-      <p>One verified historical fact (140–260 chars) per place — confirmed against Wikipedia before display</p>
+      <p>One verified stamp description (140–260 chars) per place — factual kernel confirmed before display</p>
     </div>
     <div class="topbar-right">
       <span class="key-pill" id="key-pill"></span>
@@ -338,7 +338,7 @@
         <span class="tag" data-fill="The Colosseum">The Colosseum</span>
         <span class="tag" data-fill="Santorini">Santorini</span>
       </div>
-      <div id="results-single"><div class="empty">Your verified historical fact will appear here</div></div>
+      <div id="results-single"><div class="empty">Your verified stamp description will appear here</div></div>
     </div>
 
     <!-- Batch -->
@@ -367,7 +367,7 @@
         <div class="sheet-list" id="sheet-list"></div>
         <div class="sheet-total" id="sheet-total"></div>
       </div>
-      <button class="batch-run-btn" id="btn-batch">Generate verified facts for all places</button>
+      <button class="batch-run-btn" id="btn-batch">Generate stamp descriptions for all places</button>
       <div class="progress-wrap" id="progress-wrap">
         <div class="progress-top">
           <span class="progress-label" id="progress-label">Processing…</span>
@@ -588,54 +588,72 @@ async function callClaude(prompt, maxTokens=800) {
   return (data.content||[]).map(b=>b.text||'').join('').replace(/```json|```/g,'').trim();
 }
 
-// ── Step 1: Generate candidate fact ──────────────────────────────────────────
+// ── Step 1: Generate candidate description ───────────────────────────────────
 async function generateCandidateFact(place, lastError = '') {
   const retryHint = lastError
-    ? `\n\nIMPORTANT — your previous attempt failed with this error: "${lastError}"\nAvoid the same issue. If the error mentions a specific date or figure being unverifiable, choose a COMPLETELY DIFFERENT well-documented fact about this place — do not repeat the same claim. If the error gives a corrected version of the fact, use that corrected information as your basis. If the error mentions length, adjust accordingly.`
+    ? `\n\nIMPORTANT — your previous attempt failed with this error: "${lastError}"\nAvoid the same issue. If the error mentions a specific detail being unverifiable, choose a COMPLETELY DIFFERENT surprising detail about this place — do not repeat the same claim. If the error gives a corrected version, use that as your basis. If the error mentions length, adjust accordingly.`
     : '';
 
-  const raw = await callClaude(`You are a historical fact writer. Write exactly 1 specific historical fact about: "${place}"
+  const raw = await callClaude(`You are a writer creating stamp descriptions for a passport collectible app. Each description covers a real place and follows a strict two-part hybrid format:
 
-Rules (strict):
-- The fact must be between 140 and 260 characters long — count carefully
-- It must be genuinely historical (founding, construction, historical event, age, origin, designation, discovery, etc.)
-- It must be a single complete sentence
-- It must be specific and unique to "${place}" — include a real date, year, or historical figure where possible
-- Prefer facts where the key detail (year, figure, event) is well-documented and unambiguous in encyclopaedias
-- Avoid facts that hinge on a precise date that historians debate (e.g. exact day of month) — use the year alone if safer
-- Do NOT start the sentence with "${place}" — vary the opening
+PART 1 — A surprising, specific, true detail about the place. Something that makes a well-travelled person think "I didn't know that." It must be a real, verifiable fact — not a vague generalisation.
+PART 2 — A short closing phrase (max 10 words) that lands the detail with a sense of place or scale. It must be SPECIFIC to this place — never generic filler.
 
-Place type guidance — adapt your approach based on what "${place}" is:
-- If it is a STREET or AVENUE (e.g. Fifth Avenue, Broadway): focus on when it was laid out or named, a famous historical event or parade associated with it, or when it received a notable designation
-- If it is a NEIGHBOURHOOD or DISTRICT: focus on when it was established, incorporated, or a key historical event that defined it
-- If it is a MUSEUM or INSTITUTION: focus on its founding year and founding figures, its first major collection, or a landmark moment in its history — use well-documented state/local records, not federal ones unless certain
-- If it is a PARK: focus on when it was established, designed, or opened
-- For all types: choose facts that are specific, concrete, and verifiable in Wikipedia or encyclopaedias${retryHint}
+The two parts form a single flowing sentence, 140–260 characters total.
+
+Place: "${place}"
+
+GOOD examples of the hybrid format:
+- "Built at four and a half floors per week and finished 45 days ahead of schedule during the Great Depression, the Empire State Building rose faster than New York itself expected."
+- "The Eiffel Tower grows up to 15cm taller in summer as its iron expands in the heat — a tower that literally changes with the seasons."
+- "Machu Picchu was built without mortar, its stones fitted so precisely that a knife blade cannot pass between them — and it has held for 600 years."
+- "Iceland has no standing army and has never fought a war in the modern era, yet sits on one of the world's most active volcanic hotspots."
+
+BANNED closing phrases — never use these or anything like them:
+- "...and it has defined the skyline ever since"
+- "...a place unlike any other"
+- "...it remains one of the world's great landmarks"
+- "...and its legacy endures to this day"
+- "...a testament to human achievement"
+- "...that continues to inspire millions"
+- "...making it truly unforgettable"
+- Any closing that could apply to more than 10 places on earth
+
+Place type guidance:
+- COUNTRY: use a surprising geographic, cultural or political detail — population, size, record, quirk
+- CITY: use a founding story, an urban record, a surprising structural or geographic fact
+- STREET or AVENUE: a famous event, a record, something unexpected about its scale or history
+- BUILDING or LANDMARK: construction, engineering, or record-breaking detail
+- MUSEUM or INSTITUTION: collection size, founding story, a record-breaking or surprising acquisition
+- PARK or NATURE: scale, age, geological or ecological surprise
+- NEIGHBOURHOOD or DISTRICT: origin story, transformation, cultural record${retryHint}
 
 Respond ONLY with valid JSON, no markdown:
-{"fact":"the historical fact here","country":"Full country name, e.g. United States of America"}`);
+{"fact":"the description here","country":"Full country name, e.g. United States of America"}`);
   const parsed = JSON.parse(raw);
   if (!parsed.fact || parsed.fact.length < 140 || parsed.fact.length > 260) {
-    throw new Error(`Fact length out of range: ${parsed.fact?.length} chars — target 140–260`);
+    throw new Error(`Description length out of range: ${parsed.fact?.length} chars — target 140–260`);
   }
   return { fact: parsed.fact, country: parsed.country || '' };
 }
 
 // ── Step 2: Auto-verify against Wikipedia + second source ────────────────────
 async function autoVerifyFact(place, fact) {
-  // Ask Claude to generate targeted search queries AND assess its own confidence
-  const raw = await callClaude(`You are a fact-checking assistant. Given this historical fact about "${place}":
+  // Extract the factual kernel and generate search queries
+  const raw = await callClaude(`You are a fact-checking assistant. Given this stamp description for "${place}":
 
 "${fact}"
 
+This description has two parts: a verifiable factual claim, and an evocative closing phrase. Your job is to focus ONLY on the factual claim — ignore the closing phrase entirely.
+
 Your task:
-1. Extract the single most specific verifiable claim (the key date, figure, event, or historical detail)
+1. Extract the single core verifiable claim (a specific number, record, date, engineering detail, geographic fact, etc.) — this is the part that can be confirmed in encyclopaedias
 2. Generate 3 search queries to verify it — one targeting Wikipedia, one targeting an official/encyclopaedia source, one targeting a news or reference site
-3. Rate your own confidence that this fact is accurate on a scale of 1-10, where 10 = certain
+3. Rate your confidence that the factual claim is accurate on a scale of 1-10
 
 Respond ONLY with valid JSON, no markdown:
 {
-  "key_claim": "the specific claim being verified",
+  "key_claim": "the specific verifiable claim only — not the closing phrase",
   "confidence": 8,
   "queries": [
     {"label": "Wikipedia", "q": "search query here", "type": "wikipedia"},
@@ -647,10 +665,9 @@ Respond ONLY with valid JSON, no markdown:
   const parsed = JSON.parse(raw);
   if (!parsed.queries || parsed.queries.length < 2) throw new Error('Verification query generation failed');
 
-  // Confidence gate — streets, districts and institutions naturally score lower than
-  // discrete landmarks; only reject if genuinely uncertain (below 4)
+  // Confidence gate — only reject if genuinely uncertain
   if (parsed.confidence < 4) {
-    throw new Error(`Low confidence (${parsed.confidence}/10) — fact may not be verifiable`);
+    throw new Error(`Low confidence (${parsed.confidence}/10) — factual claim may not be verifiable`);
   }
 
   // Build source links for the verify panel
@@ -664,36 +681,36 @@ Respond ONLY with valid JSON, no markdown:
     iconLetter: ICON_LETTER[j] || '?'
   }));
 
-  // Second verification pass — strictly distinguish factual errors from minor ambiguity
-  const verifyRaw = await callClaude(`You are a fact-checker. Assess this specific historical claim:
+  // Second pass — verify only the factual kernel, not the evocative closing
+  const verifyRaw = await callClaude(`You are a fact-checker. Assess this specific verifiable claim:
 
 Claim: "${parsed.key_claim}"
 Context (place): "${place}"
 
-Classify the claim into one of three categories:
-1. CORRECT — the claim is factually accurate and well-documented in encyclopaedias
-2. AMBIGUOUS — the core substance is correct but a minor detail (e.g. exact day of month, a year that sources vary on by 1–2 years, a slightly imprecise phrasing) is uncertain or debated. The claim is not *wrong*, just imprecise.
-3. WRONG — the claim contains a clear factual error (wrong century, wrong person, event that didn't happen, wrong institution type, etc.)
+NOTE: This claim was extracted from a stamp description. You are checking the factual kernel only — not any evocative or atmospheric language around it.
+
+Classify into one of three categories:
+1. CORRECT — factually accurate and well-documented
+2. AMBIGUOUS — core substance is correct but a minor detail (exact day, year varying by 1–2 across sources, slight imprecision) is uncertain. Not wrong, just imprecise.
+3. WRONG — contains a clear factual error (wrong figure, wrong person, event that didn't happen, wrong order of magnitude, etc.)
 
 Rules:
-- Do NOT mark something WRONG just because a specific day is hard to pin down — use AMBIGUOUS for that
-- Do NOT mark something WRONG because sources differ by 1–2 years on an approximate date — use AMBIGUOUS
-- Only use WRONG for substantive errors that would mislead a reader about what happened
-- If WRONG, provide a brief corrected version of the fact in the "correction" field so the next attempt can use it
+- Do NOT mark WRONG for minor date ambiguity — use AMBIGUOUS
+- Only use WRONG for errors that would genuinely mislead someone about the place
+- If WRONG, provide the corrected version in the "correction" field
 
 Respond ONLY with valid JSON, no markdown:
-{"status": "CORRECT|AMBIGUOUS|WRONG", "note": "brief explanation", "correction": "corrected fact or empty string"}`, 400);
+{"status": "CORRECT|AMBIGUOUS|WRONG", "note": "brief explanation", "correction": "corrected claim or empty string"}`, 400);
 
   const verifyResult = JSON.parse(verifyRaw);
 
   if (verifyResult.status === 'WRONG') {
     const correction = verifyResult.correction ? ` Corrected version: "${verifyResult.correction}"` : '';
-    const err = new Error(`Fact is factually incorrect: ${verifyResult.note}${correction}`);
+    const err = new Error(`Factual claim is incorrect: ${verifyResult.note}${correction}`);
     err.rejectionType = 'factual_error';
     throw err;
   }
 
-  // AMBIGUOUS is acceptable — flag it but don't reject
   return {
     sources,
     confidence: parsed.confidence,
@@ -708,10 +725,10 @@ async function generateAndVerify(place, onStatusUpdate) {
   let lastError = '';
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      onStatusUpdate(`Generating historical fact (attempt ${attempt}/${MAX_RETRIES})${attempt > 1 ? ' — retrying with different approach…' : ''}`, attempt);
+      onStatusUpdate(`Generating stamp description (attempt ${attempt}/${MAX_RETRIES})${attempt > 1 ? ' — retrying with different approach…' : ''}`, attempt);
       const { fact, country } = await generateCandidateFact(place, lastError);
 
-      onStatusUpdate(`Verifying against Wikipedia and encyclopaedia sources…`, attempt);
+      onStatusUpdate(`Verifying factual claim…`, attempt);
       const verifyData = await autoVerifyFact(place, fact);
 
       // Passed (CORRECT or AMBIGUOUS) — return everything
@@ -723,7 +740,7 @@ async function generateAndVerify(place, onStatusUpdate) {
       if (attempt < MAX_RETRIES) await sleep(800);
     }
   }
-  throw new Error(`Could not produce a verified fact after ${MAX_RETRIES} attempts. Last error: ${lastError}`);
+  throw new Error(`Could not produce a verified description after ${MAX_RETRIES} attempts. Last error: ${lastError}`);
 }
 
 // ── Render a verified fact card ───────────────────────────────────────────────
@@ -752,7 +769,7 @@ function renderFactCard(container, place, result, prefix) {
         <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.3"/><path d="M5 8.5l2 2 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         ${result.isAmbiguous ? 'Verified (approx.)' : 'Verified'}
       </span>
-      <span class="fact-type-label">Historical fact</span>
+      <span class="fact-type-label">Stamp description</span>
     </div>
     <div class="fact-text">${esc(result.fact)}</div>
     <div class="fact-foot">
@@ -767,7 +784,7 @@ function renderFactCard(container, place, result, prefix) {
       <div class="sources-heading">Sources used to verify this fact</div>
       <div class="source-links">${sourcesHtml}</div>
       ${result.isAmbiguous ? `<p class="sources-note" style="color:#b06000;background:#fef3e2;border-radius:6px;padding:8px 10px;margin-bottom:8px">⚠ Minor ambiguity: ${esc(result.verifyNote)} The core fact is correct but a specific detail may vary across sources.</p>` : ''}
-      <p class="sources-note">Each link opens a targeted Google search. The fact was automatically verified against these sources before being shown to you.</p>
+      <p class="sources-note">Each link opens a targeted Google search. The factual claim in this description was automatically verified against these sources before being shown to you.</p>
     </div>`;
 
   container.innerHTML = '';
@@ -854,7 +871,7 @@ async function generateSingle() {
   } catch(e) {
     results.innerHTML = `<div class="error-msg">
       ${esc(e.message)}<br>
-      <small style="color:#aaa;margin-top:6px;display:block">This usually means the topic is too obscure or the fact couldn't be independently verified. Try a well-known landmark or city.</small>
+      <small style="color:#aaa;margin-top:6px;display:block">This usually means no verifiable surprising detail could be confirmed for this place. Try being more specific — e.g. a named building or landmark rather than a broad area.</small>
     </div>`;
   }
 
@@ -1036,7 +1053,7 @@ async function generateBatch() {
     group.innerHTML = `
       <div class="place-heading"><div class="place-num">${i+1}</div><span>${esc(place)}</span></div>
       <div class="loading" id="group-loading-${i}" style="padding:1rem 0;font-size:13px">
-        Generating &amp; verifying${dots()}
+        Generating &amp; verifying description${dots()}
         <div class="loading-step" id="group-step-${i}"></div>
       </div>`;
     container.appendChild(group);
@@ -1071,7 +1088,7 @@ async function generateBatch() {
   pl.textContent = 'All done!';
   pc.textContent = `${allPlaces.length} / ${allPlaces.length}`;
   pb.style.width = '100%';
-  btn.disabled = false; btn.textContent = 'Generate verified facts for all places';
+  btn.disabled = false; btn.textContent = 'Generate stamp descriptions for all places';
   const uniqueSheets = [...new Set(batchResults.map(r => r.sheet).filter(Boolean))];
   const exportLabel = uniqueSheets.length > 1
     ? `All done — ${uniqueSheets.length} tabs ready to export as Excel`
@@ -1115,7 +1132,7 @@ function exportBatchXLSX() {
       'Place',
       'Country',
       ...seenHeaders,
-      'Verified Historical Fact',
+      'Stamp Description',
       'Char Count',
       'Status',
       'Failure Reason',
@@ -1131,7 +1148,7 @@ function exportBatchXLSX() {
         const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
         rows.push([r.place, r.country||'', ...extras, r.fact, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
       } else {
-        rows.push([r.place, r.country||'', ...extras, '', '', 'Failed', r.error||'Could not produce a verified fact after 3 attempts', '', '', '']);
+        rows.push([r.place, r.country||'', ...extras, '', '', 'Failed', r.error||'Could not produce a verified description after 3 attempts', '', '', '']);
       }
     });
 
@@ -1142,7 +1159,7 @@ function exportBatchXLSX() {
       { wch: 30 },  // Place
       { wch: 24 },  // Country
       ...seenHeaders.map(() => ({ wch: 20 })),
-      { wch: 70 },  // Verified Historical Fact
+      { wch: 70 },  // Stamp Description
       { wch: 10 },  // Char Count
       { wch: 10 },  // Status
       { wch: 40 },  // Failure Reason
@@ -1280,7 +1297,7 @@ function clearHistory() {
 function exportSessionCSV(sessionId, sessionDate) {
   const records = dbLoad().filter(r => (r.sessionId || 'legacy') === sessionId);
   if (!records.length) { alert('No entries found for this session.'); return; }
-  const rows = [['Place', 'Country', 'Date', 'Verified Historical Fact', 'Char Count', 'Status', 'Source 1', 'Source 2', 'Source 3']];
+  const rows = [['Place', 'Country', 'Date', 'Stamp Description', 'Char Count', 'Status', 'Source 1', 'Source 2', 'Source 3']];
   records.forEach(r => {
     const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
     rows.push([r.place, r.country||'', fmtDate(r.date), r.fact||'', (r.fact||'').length, r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
@@ -1293,7 +1310,7 @@ function exportSessionCSV(sessionId, sessionDate) {
 function exportHistoryCSV() {
   const records = dbLoad();
   if (!records.length) { alert('No history to export.'); return; }
-  const rows = [['Place', 'Country', 'Session', 'Date', 'Verified Historical Fact', 'Char Count', 'Status', 'Source 1', 'Source 2', 'Source 3']];
+  const rows = [['Place', 'Country', 'Session', 'Date', 'Stamp Description', 'Char Count', 'Status', 'Source 1', 'Source 2', 'Source 3']];
   records.forEach(r => {
     const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
     const sessionLabel = r.sessionId ? fmtDate(new Date(parseInt(r.sessionId.replace('session_',''))).toISOString()) : 'Legacy';
