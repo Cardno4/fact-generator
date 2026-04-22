@@ -289,7 +289,7 @@
   <div class="topbar">
     <div class="topbar-left">
       <h1>Fact Generator</h1>
-      <p>One verified stamp description (140–260 chars) per place — factual kernel confirmed before display</p>
+      <p>One verified stamp description (180–260 chars, target 220–250) per place — factual kernel confirmed before display</p>
     </div>
     <div class="topbar-right">
       <span class="key-pill" id="key-pill"></span>
@@ -597,20 +597,34 @@ async function generateCandidateFact(place, lastError = '') {
   const raw = await callClaude(`You are a writer creating stamp descriptions for a passport collectible app. Each description covers a real place and follows a strict two-part hybrid format:
 
 PART 1 — A surprising, specific, true detail about the place. Something that makes a well-travelled person picture it, feel its scale, or understand its character. It must be a real, verifiable fact — not a vague generalisation.
-PART 2 — A short closing phrase (max 10 words) that lands the detail with a sense of place or scale. It must be SPECIFIC to this place — never generic filler.
+PART 2 — A closing phrase that lands the detail with a sense of what it feels like to be there. It must put the reader at the place — not just add a comparative footnote. It must be SPECIFIC to this place.
 
-The two parts form a single flowing sentence, 140–260 characters total.
+The two parts form a single flowing sentence. TARGET LENGTH: 220–250 characters. Hard minimum: 180. Hard maximum: 260. Do not stop early — use the full range to make the description vivid and complete.
 
 Place: "${place}"
 
-GOOD examples of the hybrid format:
-- "Built at four and a half floors per week and finished 45 days ahead of schedule during the Great Depression, the Empire State Building rose faster than New York itself expected."
-- "The Eiffel Tower grows up to 15cm taller in summer as its iron expands in the heat — a tower that literally changes with the seasons."
-- "Machu Picchu was built without mortar, its stones fitted so precisely that a knife blade cannot pass between them — and it has held for 600 years."
-- "Portuguese explorers charted more of the world's coastline in the 15th century than any other nation, opening sea routes to Africa, India and Brazil within a single generation."
-- "More than a third of the Amazon rainforest lies within Brazil's borders — an area larger than the entire continent of Europe."
+GOOD examples — note that all of these are 200+ characters and make you feel present at the place:
+- "Built at four and a half floors per week and finished 45 days ahead of schedule during the Great Depression, the Empire State Building rose faster than New York itself expected — and still dominates its skyline today." (215 chars)
+- "The Eiffel Tower was nearly demolished in 1909 when its lease expired, saved only because its antenna was useful for military radio — a tower that came within months of never existing at all." (191 chars)
+- "Machu Picchu sits at 2,430 metres above sea level, hidden in cloud forest so dense that Spanish conquistadors never found it — its existence unknown to the outside world for over 300 years." (190 chars)
+- "DUMBO's cobblestone streets were ballast stones carried by 18th-century cargo ships from Europe, dumped in Brooklyn harbour and repurposed as roads — the ground beneath your feet once crossed the Atlantic." (205 chars)
+- "Stuttgart sits in a natural basin where Romans first planted vines 2,000 years ago, and today over 400 hectares of working vineyards still grow within the city limits — wine country hidden inside a modern city." (211 chars)
 
-BANNED fact categories — never use facts from these areas, no matter how surprising:
+BANNED closing phrases — never use these or anything like them:
+- "...and it has defined the skyline ever since"
+- "...a place unlike any other"
+- "...it remains one of the world's great landmarks"
+- "...and its legacy endures to this day"
+- "...a testament to human achievement"
+- "...that continues to inspire millions"
+- "...making it truly unforgettable"
+- "...a land smaller than [another country or US state]" — geographic comparisons that only land for one nationality
+- Any closing that could apply to more than 10 places on earth
+- Any closing that is a comparative statistic rather than a sense of place
+
+The closing phrase must answer: "what does it feel like to stand here, knowing this?" — not "how does this compare to something else?"
+
+BANNED fact categories — never use facts from these areas:
 - Politics, elections, voting systems or political parties
 - Laws, legislation, legal rulings or criminal justice policy
 - Drug policy, healthcare policy or social welfare programmes
@@ -632,16 +646,6 @@ RULES FOR NUMBERS AND QUANTITIES — critical:
 - "over 30,000 pounds" or "more than 2 million visitors" are the kind of figures that get fabricated — do not use any quantity you cannot be certain of
 - Saying "one of the longest" or "built in under a year" is fine; inventing a precise figure is not
 
-BANNED closing phrases — never use these or anything like them:
-- "...and it has defined the skyline ever since"
-- "...a place unlike any other"
-- "...it remains one of the world's great landmarks"
-- "...and its legacy endures to this day"
-- "...a testament to human achievement"
-- "...that continues to inspire millions"
-- "...making it truly unforgettable"
-- Any closing that could apply to more than 10 places on earth
-
 Place type guidance:
 - COUNTRY: use a geographic, natural, exploratory or cultural record — never a policy or political fact
 - CITY: use a founding story, an urban record, a surprising structural or geographic fact
@@ -654,8 +658,8 @@ Place type guidance:
 Respond ONLY with valid JSON, no markdown:
 {"fact":"the description here","country":"Full country name, e.g. United States of America"}`);
   const parsed = JSON.parse(raw);
-  if (!parsed.fact || parsed.fact.length < 140 || parsed.fact.length > 260) {
-    throw new Error(`Description length out of range: ${parsed.fact?.length} chars — target 140–260`);
+  if (!parsed.fact || parsed.fact.length < 180 || parsed.fact.length > 260) {
+    throw new Error(`Description length out of range: ${parsed.fact?.length} chars — target 220–250, minimum 180, maximum 260`);
   }
   return { fact: parsed.fact, country: parsed.country || '' };
 }
