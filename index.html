@@ -589,9 +589,9 @@ async function callClaude(prompt, maxTokens=800) {
 }
 
 // ── Step 1: Generate candidate description ───────────────────────────────────
-async function generateCandidateFact(place, lastError = '') {
-  const retryHint = lastError
-    ? `\n\nIMPORTANT: your previous attempt failed with this error: "${lastError}"\nYou must avoid the same issue. Rules:\n- If the error mentions an em dash, rewrite entirely without using that character.\n- If the error mentions a specific claim being incorrect or unverifiable, you must choose a COMPLETELY DIFFERENT fact about this place. Do not rephrase or slightly adjust the same claim. Pick a different subject entirely.\n- If the same type of claim (e.g. a delivery tradition, a construction statistic, an island count) has already failed, do not try a variation of it. Move to a different category of fact.\n- If the error gives a corrected version, you may use that as the basis for your rewrite.\n- If the error mentions length, adjust accordingly.`
+async function generateCandidateFact(place, lastError = '', allErrors = []) {
+  const retryHint = allErrors.length > 0
+    ? `\n\nIMPORTANT: your previous ${allErrors.length} attempt(s) failed. Full rejection history:\n${allErrors.map((e, i) => `Attempt ${i+1}: ${e}`).join('\n')}\n\nYou must produce something genuinely different from all previous attempts. Rules:\n- If any error mentions an em dash, rewrite entirely without that character.\n- If a specific claim (e.g. catacomb tunnels, cartloads of soil, a mileage figure, a delivery tradition) was already rejected, do not try any version of it again. That entire angle is closed.\n- If the same category of fact (e.g. a construction statistic, a geographic measurement, a food delivery story) has failed more than once, move to a completely different category.\n- Choose a fact from a different aspect of the place entirely: if geography failed, try architecture; if construction failed, try cultural history; if a food story failed, try the building's age or neighbourhood.\n- If the error gives a corrected version, you may use that as your basis.\n- If the error mentions length, adjust accordingly.`
     : '';
 
   const raw = await callClaude(`You are a writer creating stamp descriptions for a passport collectible app. Each description covers a real place and follows a strict two-part hybrid format:
@@ -657,10 +657,10 @@ RULES FOR NUMBERS AND QUANTITIES:
 PLACE TYPE GUIDANCE:
 - COUNTRY: geographic, natural, exploratory or cultural record. Never a policy or political fact.
 - CITY: founding story, urban record, surprising structural or geographic fact
-- STREET or AVENUE: famous event, record, something unexpected about its scale or history
+- STREET or AVENUE: focus on a famous historical event, a notable building or resident, or a cultural moment associated with this street. Do NOT use measurable claims like length, width, or property values, as these are consistently disputed across sources and will fail verification. Use narrative instead.
 - BUILDING or LANDMARK: construction, engineering, or record-breaking detail
 - MUSEUM or INSTITUTION: collection size, founding story, record-breaking or surprising acquisition
-- PARK or NATURE: scale, age, geological or ecological surprise
+- PARK or NATURE: scale, age, geological or ecological surprise. If using a construction statistic, prefer well-documented round figures (e.g. "843 acres") over process quantities (e.g. "10 million cartloads") which are rarely verifiable.
 - NEIGHBOURHOOD or DISTRICT: origin story, transformation, cultural record${retryHint}
 
 Respond ONLY with valid JSON, no markdown:
@@ -777,20 +777,20 @@ Respond ONLY with valid JSON, no markdown:
 // ── Step 3: Full pipeline — generate + verify, with retries ──────────────────
 async function generateAndVerify(place, onStatusUpdate) {
   let lastError = '';
+  const allErrors = []; // accumulate every rejection so the model knows all tried angles
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       onStatusUpdate(`Generating stamp description (attempt ${attempt}/${MAX_RETRIES})${attempt > 1 ? ', retrying with different approach...' : ''}`, attempt);
-      const { fact, country } = await generateCandidateFact(place, lastError);
+      const { fact, country } = await generateCandidateFact(place, lastError, allErrors);
 
       onStatusUpdate(`Verifying factual claim…`, attempt);
       const verifyData = await autoVerifyFact(place, fact);
 
-      // Passed (CORRECT or AMBIGUOUS) — return everything
+      // Passed — return everything
       return { fact, country, ...verifyData };
     } catch(e) {
       lastError = e.message;
-      // Don't bother retrying a genuine factual error with the same place — 
-      // let the retry loop generate a completely different fact (lastError will guide it)
+      allErrors.push(e.message);
       if (attempt < MAX_RETRIES) await sleep(800);
     }
   }
