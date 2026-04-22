@@ -591,7 +591,7 @@ async function callClaude(prompt, maxTokens=800) {
 // ── Step 1: Generate candidate description ───────────────────────────────────
 async function generateCandidateFact(place, lastError = '', allErrors = []) {
   const retryHint = allErrors.length > 0
-    ? `\n\nIMPORTANT: your previous ${allErrors.length} attempt(s) failed. Full rejection history:\n${allErrors.map((e, i) => `Attempt ${i+1}: ${e}`).join('\n')}\n\nYou must produce something genuinely different from all previous attempts. Rules:\n- If any error mentions an em dash, rewrite entirely without that character.\n- If a specific claim (e.g. catacomb tunnels, cartloads of soil, a mileage figure, a delivery tradition) was already rejected, do not try any version of it again. That entire angle is closed.\n- If the same category of fact (e.g. a construction statistic, a geographic measurement, a food delivery story) has failed more than once, move to a completely different category.\n- Choose a fact from a different aspect of the place entirely: if geography failed, try architecture; if construction failed, try cultural history; if a food story failed, try the building's age or neighbourhood.\n- If the error gives a corrected version, you may use that as your basis.\n- If the error mentions length, adjust accordingly.`
+    ? `\n\nIMPORTANT: your previous ${allErrors.length} attempt(s) failed. Full rejection history:\n${allErrors.map((e, i) => `Attempt ${i+1}: ${e}`).join('\n')}\n\nYou must produce something genuinely different from all previous attempts. Rules:\n- If any error mentions an em dash, rewrite entirely without that character.\n- If an error says "too long", your next description must be noticeably shorter. If it says "too short", make it longer. Do not produce the same length again.\n- If an error provides a "Corrected version" or "Suggested fix", use that corrected version as the factual basis for your rewrite and build the description around it. Do not ignore the correction.\n- If a specific claim was already rejected, do not try any version of it again. That entire angle is closed.\n- If the same category of fact has failed more than once, move to a completely different category.\n- Choose a fact from a different aspect of the place entirely: if geography failed, try architecture; if construction failed, try cultural history; if a food story failed, try the building's age or neighbourhood.`
     : '';
 
   const raw = await callClaude(`You are a writer creating stamp descriptions for a passport collectible app. Each description covers a real place and follows a strict two-part hybrid format:
@@ -603,7 +603,7 @@ The two parts must flow as a single natural sentence joined by a conjunction, co
 
 EM DASH RULE: The character (—) is strictly forbidden. Do not use it anywhere in the description under any circumstances. Use "and", "but", "yet", "where", "which", "whose", "leaving", "making" or a comma instead.
 
-TARGET LENGTH: 220 to 250 characters. Hard minimum: 180. Hard maximum: 260. Do not stop early. Use the full range to make the description vivid and complete.
+TARGET LENGTH: 220 to 250 characters. Hard minimum: 180. Hard maximum: 265. Do not stop early. Use the full range to make the description vivid and complete.
 
 Place: "${place}"
 
@@ -672,8 +672,10 @@ Respond ONLY with valid JSON, no markdown:
     throw new Error(`Description contains a banned em dash character. Rewrite the sentence entirely without using it.`);
   }
 
-  if (!parsed.fact || parsed.fact.length < 180 || parsed.fact.length > 260) {
-    throw new Error(`Description length out of range: ${parsed.fact?.length} chars. Target is 220 to 250 characters, minimum 180, maximum 260.`);
+  if (!parsed.fact || parsed.fact.length < 180 || parsed.fact.length > 265) {
+    const len = parsed.fact?.length;
+    const dir = len > 265 ? `too long at ${len} chars, cut it down` : `too short at ${len} chars, expand it`;
+    throw new Error(`Description length out of range: ${dir}. Target is 220 to 250 characters, minimum 180, maximum 265.`);
   }
   return { fact: parsed.fact, country: parsed.country || '' };
 }
