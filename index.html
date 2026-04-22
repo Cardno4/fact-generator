@@ -591,19 +591,26 @@ async function callClaude(prompt, maxTokens=800) {
 // ── Step 1: Generate candidate fact ──────────────────────────────────────────
 async function generateCandidateFact(place, lastError = '') {
   const retryHint = lastError
-    ? `\n\nIMPORTANT — your previous attempt failed with this error: "${lastError}"\nAvoid the same issue. If the error mentions a specific date or figure being unverifiable, choose a different well-documented fact that avoids that detail. If the error mentions length, adjust accordingly.`
+    ? `\n\nIMPORTANT — your previous attempt failed with this error: "${lastError}"\nAvoid the same issue. If the error mentions a specific date or figure being unverifiable, choose a COMPLETELY DIFFERENT well-documented fact about this place — do not repeat the same claim. If the error gives a corrected version of the fact, use that corrected information as your basis. If the error mentions length, adjust accordingly.`
     : '';
 
   const raw = await callClaude(`You are a historical fact writer. Write exactly 1 specific historical fact about: "${place}"
 
 Rules (strict):
 - The fact must be between 140 and 260 characters long — count carefully
-- It must be genuinely historical (founding, construction, historical event, age, origin, conquest, discovery, etc.)
+- It must be genuinely historical (founding, construction, historical event, age, origin, designation, discovery, etc.)
 - It must be a single complete sentence
 - It must be specific and unique to "${place}" — include a real date, year, or historical figure where possible
 - Prefer facts where the key detail (year, figure, event) is well-documented and unambiguous in encyclopaedias
 - Avoid facts that hinge on a precise date that historians debate (e.g. exact day of month) — use the year alone if safer
-- Do NOT start the sentence with "${place}" — vary the opening${retryHint}
+- Do NOT start the sentence with "${place}" — vary the opening
+
+Place type guidance — adapt your approach based on what "${place}" is:
+- If it is a STREET or AVENUE (e.g. Fifth Avenue, Broadway): focus on when it was laid out or named, a famous historical event or parade associated with it, or when it received a notable designation
+- If it is a NEIGHBOURHOOD or DISTRICT: focus on when it was established, incorporated, or a key historical event that defined it
+- If it is a MUSEUM or INSTITUTION: focus on its founding year and founding figures, its first major collection, or a landmark moment in its history — use well-documented state/local records, not federal ones unless certain
+- If it is a PARK: focus on when it was established, designed, or opened
+- For all types: choose facts that are specific, concrete, and verifiable in Wikipedia or encyclopaedias${retryHint}
 
 Respond ONLY with valid JSON, no markdown:
 {"fact":"the historical fact here","country":"Full country name, e.g. United States of America"}`);
@@ -640,8 +647,9 @@ Respond ONLY with valid JSON, no markdown:
   const parsed = JSON.parse(raw);
   if (!parsed.queries || parsed.queries.length < 2) throw new Error('Verification query generation failed');
 
-  // Confidence gate — if Claude itself rates confidence below 5, reject immediately
-  if (parsed.confidence < 5) {
+  // Confidence gate — streets, districts and institutions naturally score lower than
+  // discrete landmarks; only reject if genuinely uncertain (below 4)
+  if (parsed.confidence < 4) {
     throw new Error(`Low confidence (${parsed.confidence}/10) — fact may not be verifiable`);
   }
 
@@ -665,20 +673,22 @@ Context (place): "${place}"
 Classify the claim into one of three categories:
 1. CORRECT — the claim is factually accurate and well-documented in encyclopaedias
 2. AMBIGUOUS — the core substance is correct but a minor detail (e.g. exact day of month, a year that sources vary on by 1–2 years, a slightly imprecise phrasing) is uncertain or debated. The claim is not *wrong*, just imprecise.
-3. WRONG — the claim contains a clear factual error (wrong century, wrong person, event that didn't happen, etc.)
+3. WRONG — the claim contains a clear factual error (wrong century, wrong person, event that didn't happen, wrong institution type, etc.)
 
 Rules:
 - Do NOT mark something WRONG just because a specific day is hard to pin down — use AMBIGUOUS for that
 - Do NOT mark something WRONG because sources differ by 1–2 years on an approximate date — use AMBIGUOUS
 - Only use WRONG for substantive errors that would mislead a reader about what happened
+- If WRONG, provide a brief corrected version of the fact in the "correction" field so the next attempt can use it
 
 Respond ONLY with valid JSON, no markdown:
-{"status": "CORRECT|AMBIGUOUS|WRONG", "note": "brief explanation"}`, 300);
+{"status": "CORRECT|AMBIGUOUS|WRONG", "note": "brief explanation", "correction": "corrected fact or empty string"}`, 400);
 
   const verifyResult = JSON.parse(verifyRaw);
 
   if (verifyResult.status === 'WRONG') {
-    const err = new Error(`Fact is factually incorrect: ${verifyResult.note}`);
+    const correction = verifyResult.correction ? ` Corrected version: "${verifyResult.correction}"` : '';
+    const err = new Error(`Fact is factually incorrect: ${verifyResult.note}${correction}`);
     err.rejectionType = 'factual_error';
     throw err;
   }
