@@ -289,7 +289,7 @@
   <div class="topbar">
     <div class="topbar-left">
       <h1>Fact Generator</h1>
-      <p>One verified historical fact (150–250 chars) per place — confirmed against Wikipedia before display</p>
+      <p>One verified historical fact (140–260 chars) per place — confirmed against Wikipedia before display</p>
     </div>
     <div class="topbar-right">
       <span class="key-pill" id="key-pill"></span>
@@ -589,22 +589,27 @@ async function callClaude(prompt, maxTokens=800) {
 }
 
 // ── Step 1: Generate candidate fact ──────────────────────────────────────────
-async function generateCandidateFact(place) {
+async function generateCandidateFact(place, lastError = '') {
+  const retryHint = lastError
+    ? `\n\nIMPORTANT — your previous attempt failed with this error: "${lastError}"\nAvoid the same issue. If the error mentions a specific date or figure being unverifiable, choose a different well-documented fact that avoids that detail. If the error mentions length, adjust accordingly.`
+    : '';
+
   const raw = await callClaude(`You are a historical fact writer. Write exactly 1 specific historical fact about: "${place}"
 
 Rules (strict):
-- The fact must be between 150 and 250 characters long — count carefully
+- The fact must be between 140 and 260 characters long — count carefully
 - It must be genuinely historical (founding, construction, historical event, age, origin, conquest, discovery, etc.)
 - It must be a single complete sentence
 - It must be specific and unique to "${place}" — include a real date, year, or historical figure where possible
-- It must be verifiable — only state things that can be confirmed in Wikipedia and other encyclopaedias
-- Do NOT start the sentence with "${place}" — vary the opening
+- Prefer facts where the key detail (year, figure, event) is well-documented and unambiguous in encyclopaedias
+- Avoid facts that hinge on a precise date that historians debate (e.g. exact day of month) — use the year alone if safer
+- Do NOT start the sentence with "${place}" — vary the opening${retryHint}
 
 Respond ONLY with valid JSON, no markdown:
 {"fact":"the historical fact here"}`);
   const parsed = JSON.parse(raw);
-  if (!parsed.fact || parsed.fact.length < 150 || parsed.fact.length > 250) {
-    throw new Error(`Fact length out of range: ${parsed.fact?.length} chars`);
+  if (!parsed.fact || parsed.fact.length < 140 || parsed.fact.length > 260) {
+    throw new Error(`Fact length out of range: ${parsed.fact?.length} chars — target 140–260`);
   }
   return parsed.fact;
 }
@@ -635,8 +640,8 @@ Respond ONLY with valid JSON, no markdown:
   const parsed = JSON.parse(raw);
   if (!parsed.queries || parsed.queries.length < 2) throw new Error('Verification query generation failed');
 
-  // Confidence gate — if Claude itself rates confidence below 6, reject immediately
-  if (parsed.confidence < 6) {
+  // Confidence gate — if Claude itself rates confidence below 5, reject immediately
+  if (parsed.confidence < 5) {
     throw new Error(`Low confidence (${parsed.confidence}/10) — fact may not be verifiable`);
   }
 
@@ -651,27 +656,41 @@ Respond ONLY with valid JSON, no markdown:
     iconLetter: ICON_LETTER[j] || '?'
   }));
 
-  // Second verification pass — ask Claude to confirm the claim is accurate
-  // given the key claim extracted above
-  const verifyRaw = await callClaude(`You are a fact-checker. Answer only about this specific historical claim:
+  // Second verification pass — strictly distinguish factual errors from minor ambiguity
+  const verifyRaw = await callClaude(`You are a fact-checker. Assess this specific historical claim:
 
 Claim: "${parsed.key_claim}"
 Context (place): "${place}"
 
-Based on your training data, is this claim factually accurate?
-- If YES: respond {"verified": true, "note": "brief explanation of why this is correct"}
-- If NO or UNCERTAIN: respond {"verified": false, "note": "brief explanation of the issue"}
+Classify the claim into one of three categories:
+1. CORRECT — the claim is factually accurate and well-documented in encyclopaedias
+2. AMBIGUOUS — the core substance is correct but a minor detail (e.g. exact day of month, a year that sources vary on by 1–2 years, a slightly imprecise phrasing) is uncertain or debated. The claim is not *wrong*, just imprecise.
+3. WRONG — the claim contains a clear factual error (wrong century, wrong person, event that didn't happen, etc.)
 
-Be strict — only mark verified:true if you are highly confident this is accurate.
-Respond ONLY with valid JSON, no markdown.`, 300);
+Rules:
+- Do NOT mark something WRONG just because a specific day is hard to pin down — use AMBIGUOUS for that
+- Do NOT mark something WRONG because sources differ by 1–2 years on an approximate date — use AMBIGUOUS
+- Only use WRONG for substantive errors that would mislead a reader about what happened
+
+Respond ONLY with valid JSON, no markdown:
+{"status": "CORRECT|AMBIGUOUS|WRONG", "note": "brief explanation"}`, 300);
 
   const verifyResult = JSON.parse(verifyRaw);
 
-  if (!verifyResult.verified) {
-    throw new Error(`Fact failed verification: ${verifyResult.note}`);
+  if (verifyResult.status === 'WRONG') {
+    const err = new Error(`Fact is factually incorrect: ${verifyResult.note}`);
+    err.rejectionType = 'factual_error';
+    throw err;
   }
 
-  return { sources, confidence: parsed.confidence, key_claim: parsed.key_claim, verifyNote: verifyResult.note };
+  // AMBIGUOUS is acceptable — flag it but don't reject
+  return {
+    sources,
+    confidence: parsed.confidence,
+    key_claim: parsed.key_claim,
+    verifyNote: verifyResult.note,
+    isAmbiguous: verifyResult.status === 'AMBIGUOUS'
+  };
 }
 
 // ── Step 3: Full pipeline — generate + verify, with retries ──────────────────
@@ -679,16 +698,18 @@ async function generateAndVerify(place, onStatusUpdate) {
   let lastError = '';
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      onStatusUpdate(`Generating historical fact (attempt ${attempt}/${MAX_RETRIES})${attempt > 1 ? ' — retrying after failed verification…' : ''}`, attempt);
-      const fact = await generateCandidateFact(place);
+      onStatusUpdate(`Generating historical fact (attempt ${attempt}/${MAX_RETRIES})${attempt > 1 ? ' — retrying with different approach…' : ''}`, attempt);
+      const fact = await generateCandidateFact(place, lastError);
 
       onStatusUpdate(`Verifying against Wikipedia and encyclopaedia sources…`, attempt);
       const verifyData = await autoVerifyFact(place, fact);
 
-      // Passed — return everything
+      // Passed (CORRECT or AMBIGUOUS) — return everything
       return { fact, ...verifyData };
     } catch(e) {
       lastError = e.message;
+      // Don't bother retrying a genuine factual error with the same place — 
+      // let the retry loop generate a completely different fact (lastError will guide it)
       if (attempt < MAX_RETRIES) await sleep(800);
     }
   }
@@ -719,7 +740,7 @@ function renderFactCard(container, place, result, prefix) {
     <div class="fact-card-header">
       <span class="fact-verified-badge">
         <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.3"/><path d="M5 8.5l2 2 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Verified
+        ${result.isAmbiguous ? 'Verified (approx.)' : 'Verified'}
       </span>
       <span class="fact-type-label">Historical fact</span>
     </div>
@@ -735,6 +756,7 @@ function renderFactCard(container, place, result, prefix) {
     <div class="sources-panel" id="sources-${prefix}">
       <div class="sources-heading">Sources used to verify this fact</div>
       <div class="source-links">${sourcesHtml}</div>
+      ${result.isAmbiguous ? `<p class="sources-note" style="color:#b06000;background:#fef3e2;border-radius:6px;padding:8px 10px;margin-bottom:8px">⚠ Minor ambiguity: ${esc(result.verifyNote)} The core fact is correct but a specific detail may vary across sources.</p>` : ''}
       <p class="sources-note">Each link opens a targeted Google search. The fact was automatically verified against these sources before being shown to you.</p>
     </div>`;
 
