@@ -591,34 +591,32 @@ async function callClaude(prompt, maxTokens=800) {
 // ── Step 1: Generate candidate description ───────────────────────────────────
 async function generateCandidateFact(place, lastError = '') {
   const retryHint = lastError
-    ? `\n\nIMPORTANT — your previous attempt failed with this error: "${lastError}"\nAvoid the same issue. If the error mentions an em dash, rewrite the sentence entirely without using — anywhere. If the error mentions a specific detail being unverifiable, choose a COMPLETELY DIFFERENT surprising detail about this place. If the error gives a corrected version, use that as your basis. If the error mentions length, adjust accordingly.`
+    ? `\n\nIMPORTANT: your previous attempt failed with this error: "${lastError}"\nAvoid the same issue. If the error mentions an em dash, rewrite the sentence entirely without using that character anywhere. If the error mentions a specific detail being unverifiable, choose a COMPLETELY DIFFERENT surprising detail about this place. If the error gives a corrected version, use that as your basis. If the error mentions length, adjust accordingly.`
     : '';
 
   const raw = await callClaude(`You are a writer creating stamp descriptions for a passport collectible app. Each description covers a real place and follows a strict two-part hybrid format:
 
-PART 1 — A surprising, specific, true detail about the place. Something that makes a well-travelled person picture it, feel its scale, or understand its character. It must be a real, verifiable fact — not a vague generalisation.
-PART 2 — A closing phrase that lands the detail with a sense of what it feels like to be there. It must put the reader at the place — not just add a comparative footnote. It must be SPECIFIC to this place.
+PART 1: A surprising, specific, true detail about the place. Something that makes a well-travelled person picture it, feel its scale, or understand its character. It must be a real, verifiable fact, not a vague generalisation.
+PART 2: A closing phrase that lands the detail with a sense of what it feels like to be there. It must put the reader at the place, not just add a comparative footnote. It must be SPECIFIC to this place.
 
-The two parts must flow as a single natural sentence joined by a conjunction, comma, or relative clause. NEVER use an em dash (—) anywhere in the description. Find a more natural way to connect the two parts.
+The two parts must flow as a single natural sentence joined by a conjunction, comma, or relative clause.
 
-TARGET LENGTH: 220–250 characters. Hard minimum: 180. Hard maximum: 260. Do not stop early — use the full range to make the description vivid and complete.
+EM DASH RULE: The character (—) is strictly forbidden. Do not use it anywhere in the description under any circumstances. Use "and", "but", "yet", "where", "which", "whose", "leaving", "making" or a comma instead.
+
+TARGET LENGTH: 220 to 250 characters. Hard minimum: 180. Hard maximum: 260. Do not stop early. Use the full range to make the description vivid and complete.
 
 Place: "${place}"
 
-GOOD examples — all 200+ characters, no em dashes, make you feel present at the place:
+GOOD EXAMPLES (200+ characters, no em dashes, makes you feel present at the place):
 - "Built at four and a half floors per week and finished 45 days ahead of schedule during the Great Depression, the Empire State Building rose faster than New York itself expected, and still defines what a city can look like." (222 chars)
 - "The Eiffel Tower was nearly demolished in 1909 when its lease expired, saved only because its antenna proved useful for military radio transmissions, coming within months of never existing at all." (196 chars)
 - "Machu Picchu sits at 2,430 metres above sea level, hidden in cloud forest so dense that Spanish conquistadors never found it, leaving its existence unknown to the outside world for over 300 years." (197 chars)
 - "DUMBO's cobblestone streets were laid with ballast stones carried by 18th-century cargo ships from Europe, dumped in Brooklyn's harbour after long Atlantic voyages and repurposed as roads beneath the bridges." (208 chars)
-- "Stuttgart was founded as a stud farm in the 10th century, its name meaning 'mare garden' in Old German, and its coat of arms still bears a black horse on gold after more than a thousand years." (192 chars)
+- "Stuttgart was founded as a stud farm in the 10th century, its name meaning mare garden in Old German, and its coat of arms still bears a black horse on gold after more than a thousand years." (191 chars)
 
-BANNED — never use an em dash (—) under any circumstances. Instead use:
-- A conjunction: "and", "but", "yet", "so"
-- A relative clause: "which", "where", "whose"
-- A participial phrase: "leaving...", "making...", "turning..."
-- A new clause with a comma
+BANNED: the character (—). Every single example above connects its two parts without using it. So must you.
 
-BANNED closing phrases — never use these or anything like them:
+BANNED CLOSING PHRASES (never use these or anything like them):
 - "...and it has defined the skyline ever since"
 - "...a place unlike any other"
 - "...it remains one of the world's great landmarks"
@@ -632,7 +630,7 @@ BANNED closing phrases — never use these or anything like them:
 
 The closing phrase must answer: "what does it feel like to stand here, knowing this?" not "how does this compare to something else?"
 
-BANNED fact categories — never use facts from these areas:
+BANNED FACT CATEGORIES (never use facts from these areas):
 - Politics, elections, voting systems or political parties
 - Laws, legislation, legal rulings or criminal justice policy
 - Drug policy, healthcare policy or social welfare programmes
@@ -640,25 +638,25 @@ BANNED fact categories — never use facts from these areas:
 - Economic policy, tax systems or trade agreements
 - Immigration or citizenship rules
 
-INSTEAD, always draw from these categories:
+PREFERRED FACT CATEGORIES (always draw from these):
 - Geography: size, position, borders, terrain, coastline, elevation, rivers, islands
 - Natural world: climate records, wildlife, geology, ecosystems, natural phenomena
 - Architecture and engineering: construction records, materials, scale, structural facts
 - History of exploration, trade or empire: routes, discoveries, expeditions
 - Cultural output: language reach, UNESCO sites, ancient civilisations, historic firsts
-- Physical records: oldest, largest, deepest, highest, longest — specific and measurable
+- Physical records: oldest, largest, deepest, highest, longest, specific and measurable
 
-RULES FOR NUMBERS AND QUANTITIES — critical:
+RULES FOR NUMBERS AND QUANTITIES:
 - Only include a specific number, measurement or quantity if it is well-documented enough to appear in multiple encyclopaedia-level sources
-- If you are not certain a specific number is confirmed, describe the fact WITHOUT the number rather than inventing or estimating one
-- Saying "one of the longest" or "built in under a year" is fine; inventing a precise figure is not
+- If you are not certain a specific number is confirmed, describe the fact WITHOUT the number rather than inventing one
+- Saying "one of the longest" or "built in under a year" is fine. Inventing a precise figure is not.
 
-Place type guidance:
-- COUNTRY: use a geographic, natural, exploratory or cultural record — never a policy or political fact
-- CITY: use a founding story, an urban record, a surprising structural or geographic fact
-- STREET or AVENUE: a famous event, a record, something unexpected about its scale or history
+PLACE TYPE GUIDANCE:
+- COUNTRY: geographic, natural, exploratory or cultural record. Never a policy or political fact.
+- CITY: founding story, urban record, surprising structural or geographic fact
+- STREET or AVENUE: famous event, record, something unexpected about its scale or history
 - BUILDING or LANDMARK: construction, engineering, or record-breaking detail
-- MUSEUM or INSTITUTION: collection size, founding story, a record-breaking or surprising acquisition
+- MUSEUM or INSTITUTION: collection size, founding story, record-breaking or surprising acquisition
 - PARK or NATURE: scale, age, geological or ecological surprise
 - NEIGHBOURHOOD or DISTRICT: origin story, transformation, cultural record${retryHint}
 
@@ -666,13 +664,13 @@ Respond ONLY with valid JSON, no markdown:
 {"fact":"the description here","country":"Full country name, e.g. United States of America"}`);
   const parsed = JSON.parse(raw);
 
-  // Hard strip — reject any description containing an em dash
-  if (parsed.fact && parsed.fact.includes('—')) {
-    throw new Error(`Description contains a banned em dash. Rewrite without using — anywhere.`);
+  // Hard reject: any em dash in the output triggers an immediate retry
+  if (parsed.fact && parsed.fact.includes('\u2014')) {
+    throw new Error(`Description contains a banned em dash character. Rewrite the sentence entirely without using it.`);
   }
 
   if (!parsed.fact || parsed.fact.length < 180 || parsed.fact.length > 260) {
-    throw new Error(`Description length out of range: ${parsed.fact?.length} chars — target 220–250, minimum 180, maximum 260`);
+    throw new Error(`Description length out of range: ${parsed.fact?.length} chars. Target is 220 to 250 characters, minimum 180, maximum 260.`);
   }
   return { fact: parsed.fact, country: parsed.country || '' };
 }
@@ -684,16 +682,16 @@ async function autoVerifyFact(place, fact) {
 
 "${fact}"
 
-This description has two parts: a verifiable factual claim, and an evocative closing phrase. Your job is to focus ONLY on the factual claim — ignore the closing phrase entirely.
+This description has two parts: a verifiable factual claim, and an evocative closing phrase. Your job is to focus ONLY on the factual claim. Ignore the closing phrase entirely.
 
 Your task:
-1. Extract the single core verifiable claim (a specific number, record, date, engineering detail, geographic fact, etc.) — this is the part that can be confirmed in encyclopaedias
-2. Generate 3 search queries to verify it — one targeting Wikipedia, one targeting an official/encyclopaedia source, one targeting a news or reference site
+1. Extract the single core verifiable claim (a specific number, record, date, engineering detail, geographic fact, etc.) that can be confirmed in encyclopaedias
+2. Generate 3 search queries to verify it: one targeting Wikipedia, one targeting an official or encyclopaedia source, one targeting a news or reference site
 3. Rate your confidence that the factual claim is accurate on a scale of 1-10
 
 Respond ONLY with valid JSON, no markdown:
 {
-  "key_claim": "the specific verifiable claim only — not the closing phrase",
+  "key_claim": "the specific verifiable claim only, not the closing phrase",
   "confidence": 8,
   "queries": [
     {"label": "Wikipedia", "q": "search query here", "type": "wikipedia"},
@@ -705,9 +703,9 @@ Respond ONLY with valid JSON, no markdown:
   const parsed = JSON.parse(raw);
   if (!parsed.queries || parsed.queries.length < 2) throw new Error('Verification query generation failed');
 
-  // Confidence gate — only reject if genuinely uncertain
+  // Confidence gate: only reject if genuinely uncertain
   if (parsed.confidence < 4) {
-    throw new Error(`Low confidence (${parsed.confidence}/10) — factual claim may not be verifiable`);
+    throw new Error(`Low confidence (${parsed.confidence}/10): factual claim may not be verifiable`);
   }
 
   // Build source links for the verify panel
@@ -721,25 +719,25 @@ Respond ONLY with valid JSON, no markdown:
     iconLetter: ICON_LETTER[j] || '?'
   }));
 
-  // Second pass — verify only the factual kernel, not the evocative closing
+  // Second pass: verify only the factual kernel, not the evocative closing
   const verifyRaw = await callClaude(`You are a fact-checker. Assess this specific verifiable claim:
 
 Claim: "${parsed.key_claim}"
 Context (place): "${place}"
 
-NOTE: This claim was extracted from a stamp description. You are checking the factual kernel only — not any evocative or atmospheric language around it.
+NOTE: This claim was extracted from a stamp description. You are checking the factual kernel only, not any evocative or atmospheric language around it.
 
 Classify into one of three categories:
-1. CORRECT — factually accurate and well-documented in multiple reliable sources
-2. AMBIGUOUS — the core event or detail is real and documented, but a minor surrounding detail (e.g. exact day of month, year varying by 1–2 across sources) is uncertain. The substance is not wrong, just slightly imprecise.
-3. WRONG — contains a clear factual error, OR includes a specific number/quantity/measurement that cannot be independently confirmed in encyclopaedia-level sources
+1. CORRECT: factually accurate and well-documented in multiple reliable sources
+2. AMBIGUOUS: the core event or detail is real and documented, but a minor surrounding detail (e.g. exact day of month, year varying by 1 to 2 across sources) is uncertain. The substance is not wrong, just slightly imprecise.
+3. WRONG: contains a clear factual error, OR includes a specific number or quantity or measurement that cannot be independently confirmed in encyclopaedia-level sources
 
-CRITICAL rule on numbers: if the claim contains a specific quantity (e.g. "30,000 pounds", "80 percent", "2 million visitors") and that exact figure is not confirmed in multiple reliable sources, classify as WRONG — not AMBIGUOUS. An unverifiable specific number is not a minor imprecision, it is a fabricated statistic.
+CRITICAL rule on numbers: if the claim contains a specific quantity (e.g. "30,000 pounds", "80 percent", "2 million visitors") and that exact figure is not confirmed in multiple reliable sources, classify as WRONG, not AMBIGUOUS. An unverifiable specific number is not a minor imprecision, it is a fabricated statistic.
 
 Rules:
-- AMBIGUOUS is only for genuine minor date or phrasing uncertainty — not for unconfirmed quantities
+- AMBIGUOUS is only for genuine minor date or phrasing uncertainty, not for unconfirmed quantities
 - Use WRONG for any specific figure that appears estimated, approximate or unverifiable
-- If WRONG, provide the corrected version in the "correction" field — if the number is the problem, suggest a version of the claim without the unverifiable figure
+- If WRONG, provide the corrected version in the correction field. If the number is the problem, suggest a version of the claim without the unverifiable figure.
 
 Respond ONLY with valid JSON, no markdown:
 {"status": "CORRECT|AMBIGUOUS|WRONG", "note": "brief explanation", "correction": "corrected claim or empty string"}`, 400);
@@ -767,7 +765,7 @@ async function generateAndVerify(place, onStatusUpdate) {
   let lastError = '';
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      onStatusUpdate(`Generating stamp description (attempt ${attempt}/${MAX_RETRIES})${attempt > 1 ? ' — retrying with different approach…' : ''}`, attempt);
+      onStatusUpdate(`Generating stamp description (attempt ${attempt}/${MAX_RETRIES})${attempt > 1 ? ', retrying with different approach...' : ''}`, attempt);
       const { fact, country } = await generateCandidateFact(place, lastError);
 
       onStatusUpdate(`Verifying factual claim…`, attempt);
