@@ -589,9 +589,14 @@ async function callClaude(prompt, maxTokens=800) {
 }
 
 // ── Step 1: Generate candidate description ───────────────────────────────────
-async function generateCandidateFact(place, lastError = '', allErrors = []) {
-  const retryHint = allErrors.length > 0
-    ? `\n\nIMPORTANT: your previous ${allErrors.length} attempt(s) failed. Full rejection history:\n${allErrors.map((e, i) => `Attempt ${i+1}: ${e}`).join('\n')}\n\nYou must produce something genuinely different from all previous attempts. Rules:\n- If any error mentions an em dash, rewrite entirely without that character.\n- If an error says "too long", your next description must be noticeably shorter. If it says "too short", make it longer. Do not produce the same length again.\n- If an error provides a "Corrected version" or "Suggested fix", use that corrected version as the factual basis for your rewrite and build the description around it. Do not ignore the correction.\n- If a specific claim was already rejected, do not try any version of it again. That entire angle is closed.\n- If the same category of fact has failed more than once, move to a completely different category.\n- Choose a fact from a different aspect of the place entirely: if geography failed, try architecture; if construction failed, try cultural history; if a food story failed, try the building's age or neighbourhood.`
+async function generateCandidateFact(place, lastError = '', allErrors = [], corrections = []) {
+  // If the verifier provided a corrected factual seed, use it directly as the mandatory basis
+  const correctionSeed = corrections.length > 0
+    ? `\n\nVERIFIED FACTUAL SEED: A previous attempt was rejected but the fact-checker provided this verified factual basis. You MUST build your description around it:\n"${corrections[corrections.length - 1]}"\nKeep the factual content exactly as stated. Your only job is to add a specific, grounded closing phrase that puts the reader at the place. Do not invent new facts or add unverifiable details.`
+    : '';
+
+  const retryHint = allErrors.length > 0 && corrections.length === 0
+    ? `\n\nIMPORTANT: your previous ${allErrors.length} attempt(s) failed. Full rejection history:\n${allErrors.map((e, i) => `Attempt ${i+1}: ${e}`).join('\n')}\n\nYou must produce something genuinely different from all previous attempts. Rules:\n- If any error mentions an em dash, rewrite entirely without that character.\n- If an error says "too long", your next description must be noticeably shorter. If it says "too short", make it longer.\n- If a specific claim was already rejected, do not try any version of it again. That entire angle is closed.\n- If the same category of fact has failed more than once, move to a completely different category.\n- Choose a fact from a different aspect of the place entirely: if geography failed, try architecture; if construction failed, try cultural history; if a food story failed, try the building's age or neighbourhood.`
     : '';
 
   const raw = await callClaude(`You are a writer creating stamp descriptions for a passport collectible app. Each description covers a real place and follows a strict two-part hybrid format:
@@ -661,7 +666,8 @@ PLACE TYPE GUIDANCE:
 - BUILDING or LANDMARK: construction, engineering, or record-breaking detail
 - MUSEUM or INSTITUTION: collection size, founding story, record-breaking or surprising acquisition
 - PARK or NATURE: scale, age, geological or ecological surprise. If using a construction statistic, prefer well-documented round figures (e.g. "843 acres") over process quantities (e.g. "10 million cartloads") which are rarely verifiable.
-- NEIGHBOURHOOD or DISTRICT: origin story, transformation, cultural record${retryHint}
+- ISLAND or ARCHIPELAGO: geological origin, coral reef facts, cultural history of settlement, or a well-documented geographic record. Avoid date line and meridian claims as these are frequently imprecise. Avoid island count claims where the inhabited/uninhabited split is disputed.
+- NEIGHBOURHOOD or DISTRICT: origin story, transformation, cultural record${retryHint}${correctionSeed}
 
 Respond ONLY with valid JSON, no markdown:
 {"fact":"the description here","country":"Full country name, e.g. United States of America"}`);
@@ -779,20 +785,23 @@ Respond ONLY with valid JSON, no markdown:
 // ── Step 3: Full pipeline — generate + verify, with retries ──────────────────
 async function generateAndVerify(place, onStatusUpdate) {
   let lastError = '';
-  const allErrors = []; // accumulate every rejection so the model knows all tried angles
+  const allErrors = [];
+  const corrections = []; // extracted corrected versions from verifier — used as direct seeds
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       onStatusUpdate(`Generating stamp description (attempt ${attempt}/${MAX_RETRIES})${attempt > 1 ? ', retrying with different approach...' : ''}`, attempt);
-      const { fact, country } = await generateCandidateFact(place, lastError, allErrors);
+      const { fact, country } = await generateCandidateFact(place, lastError, allErrors, corrections);
 
       onStatusUpdate(`Verifying factual claim…`, attempt);
       const verifyData = await autoVerifyFact(place, fact);
 
-      // Passed — return everything
       return { fact, country, ...verifyData };
     } catch(e) {
       lastError = e.message;
       allErrors.push(e.message);
+      // Extract any corrected version or suggested fix from the error message
+      const corrMatch = e.message.match(/(?:Corrected version|Suggested fix): "([^"]+)"/);
+      if (corrMatch) corrections.push(corrMatch[1]);
       if (attempt < MAX_RETRIES) await sleep(800);
     }
   }
