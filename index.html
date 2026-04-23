@@ -1235,7 +1235,8 @@ function exportBatchXLSX() {
       const extras = seenHeaders.map(h => extraColsByResult[i][h] || '');
       const capPlace = r.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
       if (r.fact) {
-        const fullDesc = `You got this stamp by visiting ${capPlace}.\n\n${r.fact}`;
+        // Use \r\n — required by Excel for in-cell line breaks
+        const fullDesc = `You got this stamp by visiting ${capPlace}.\r\n\r\n${r.fact}`;
         const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
         rows.push([r.place, r.country||'', ...extras, fullDesc, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
       } else {
@@ -1258,14 +1259,16 @@ function exportBatchXLSX() {
       { wch: 50 },  // Source 3
     ];
 
-    // Apply wrap text to the Stamp Description column so \n renders in Excel
-    const descColIndex = 2 + seenHeaders.length; // Place, Country, ...extras, then desc
+    // Apply wrap text to description column cells so \r\n line breaks render in Excel
+    // Must set cellStyles:true in write options AND patch cells directly after aoa_to_sheet
+    const descColIndex = 2 + seenHeaders.length;
     Object.keys(ws).forEach(addr => {
       if (addr[0] === '!') return;
-      const col = XLSX.utils.decode_cell(addr).c;
-      if (col === descColIndex) {
-        if (!ws[addr].s) ws[addr].s = {};
-        ws[addr].s.alignment = { wrapText: true, vertical: 'top' };
+      const cell = XLSX.utils.decode_cell(addr);
+      if (cell.c === descColIndex) {
+        ws[addr].s = { alignment: { wrapText: true, vertical: 'top' } };
+      } else {
+        ws[addr].s = { alignment: { vertical: 'top' } };
       }
     });
 
@@ -1275,7 +1278,7 @@ function exportBatchXLSX() {
   });
 
   // Write and trigger download
-  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array', cellStyles: true });
   const blob = new Blob([wbout], { type: 'application/octet-stream' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href = url; a.download = 'facts-export.xlsx'; a.click();
