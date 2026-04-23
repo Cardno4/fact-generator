@@ -596,7 +596,7 @@ async function callClaude(prompt, maxTokens=800) {
 async function generateCandidateFact(place, lastError = '', allErrors = [], corrections = []) {
   // If the verifier provided a corrected factual seed, use it directly as the mandatory basis
   const correctionSeed = corrections.length > 0
-    ? `\n\nVERIFIED FACTUAL SEED: A previous attempt failed but the fact-checker confirmed this exact factual content is accurate:\n"${corrections[corrections.length - 1]}"\n\nThis seed IS your factual basis. Do not contradict it or add unverifiable claims. If the seed is shorter than 140 characters, expand it with one additional well-documented detail about the same aspect of this place to reach the target length. The total description must be between 160 and 220 characters.`
+    ? `\n\nVERIFIED FACTUAL SEED: A previous attempt failed but the fact-checker confirmed this exact factual content is accurate:\n"${corrections[corrections.length - 1]}"\n\nThis seed IS your factual basis. Do not contradict it or add unverifiable claims. If the seed is shorter than 150 characters, expand it with one additional well-documented detail about the same aspect of this place to reach the target length. The total description must be between 160 and 220 characters.`
     : '';
 
   const retryHint = allErrors.length > 0 && corrections.length === 0
@@ -611,7 +611,7 @@ The stamp card already tells the user they visited this place. Your job is only 
 
 EM DASH RULE: The character (—) is strictly forbidden. Do not use it anywhere.
 
-TARGET LENGTH: 160 to 220 characters. Hard minimum: 140. Hard maximum: 230. The sentence should be as long as it needs to be to state the fact clearly and specifically, and no longer.
+TARGET LENGTH: 160 to 220 characters. Hard minimum: 150. Hard maximum: 240. The sentence should be as long as it needs to be to state the fact clearly and specifically, and no longer.
 
 Place: "${place}"
 
@@ -668,10 +668,10 @@ Respond ONLY with valid JSON, no markdown:
     throw new Error(`Description contains a banned em dash character. Rewrite without using it.`);
   }
 
-  if (!parsed.fact || parsed.fact.length < 140 || parsed.fact.length > 230) {
+  if (!parsed.fact || parsed.fact.length < 150 || parsed.fact.length > 240) {
     const len = parsed.fact?.length;
-    const dir = len > 230 ? `too long at ${len} chars, cut it down` : `too short at ${len} chars, expand it`;
-    throw new Error(`Description length out of range: ${dir}. Target is 160 to 220 characters, minimum 140, maximum 230.`);
+    const dir = len > 240 ? `too long at ${len} chars, cut it down` : `too short at ${len} chars, expand it`;
+    throw new Error(`Description length out of range: ${dir}. Target is 160 to 220 characters, minimum 150, maximum 240.`);
   }
   return { fact: parsed.fact, country: parsed.country || '' };
 }
@@ -828,6 +828,10 @@ function renderFactCard(container, place, result, prefix) {
         <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l1.8 1.8 3.2-3.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         View sources
       </button>
+      <button class="verify-btn" data-action="refresh-fact" data-place="${esc(place)}" data-prefix="${prefix}">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M13.5 2.5A6.5 6.5 0 1 1 7 1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><polyline points="10 1 7 1 7 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        New description
+      </button>
       <button class="copy-fact-btn" data-action="copy-fact" data-store-id="${storeId}">Copy</button>
     </div>
     <div class="sources-panel" id="sources-${prefix}">
@@ -864,6 +868,22 @@ function handleCardClick(e) {
       ? `You got this stamp by visiting ${stored.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ')}.\n\n${stored.fact}`
       : stored.fact;
     copyToClipboard(fullText, btn);
+  }
+
+  if (action === 'refresh-fact') {
+    const place = btn.dataset.place;
+    const prefix = btn.dataset.prefix;
+    if (!place) return;
+    btn.disabled = true;
+    btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M13.5 2.5A6.5 6.5 0 1 1 7 1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><polyline points="10 1 7 1 7 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg> Generating…`;
+    if (prefix === 's') {
+      // Single mode — re-run the whole single generate
+      generateSingle();
+    } else {
+      // Batch mode — extract index from prefix "b{i}" and retry that item
+      const i = parseInt(prefix.replace('b', ''));
+      if (!isNaN(i)) retryItem(i);
+    }
   }
 
   if (action === 'db-export-session') {
@@ -1235,8 +1255,9 @@ function exportBatchXLSX() {
       const extras = seenHeaders.map(h => extraColsByResult[i][h] || '');
       const capPlace = r.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
       if (r.fact) {
-        // Use \r\n — required by Excel for in-cell line breaks
-        const fullDesc = `You got this stamp by visiting ${capPlace}.\r\n\r\n${r.fact}`;
+        // Use actual CRLF character (char code 13+10) — Excel requires this for in-cell line breaks
+        const CRLF = '\r\n';
+        const fullDesc = `You got this stamp by visiting ${capPlace}.${CRLF}${CRLF}${r.fact}`;
         const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
         rows.push([r.place, r.country||'', ...extras, fullDesc, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
       } else {
