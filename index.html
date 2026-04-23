@@ -1421,7 +1421,6 @@ function exportHistoryCSV() {
     const sessionLabel = r.sessionId ? fmtDate(new Date(parseInt(r.sessionId.replace('session_',''))).toISOString()) : 'Legacy';
     rows.push([r.place, r.country||'', fullDesc, (r.fact||'').length, sessionLabel, fmtDate(r.date), r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
   });
-  });
   downloadCSV(rows, 'facts-history-all.csv');
 }
 
