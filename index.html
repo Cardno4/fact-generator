@@ -593,7 +593,7 @@ async function callClaude(prompt, maxTokens=800) {
 async function generateCandidateFact(place, lastError = '', allErrors = [], corrections = []) {
   // If the verifier provided a corrected factual seed, use it directly as the mandatory basis
   const correctionSeed = corrections.length > 0
-    ? `\n\nVERIFIED FACTUAL SEED: A previous attempt failed but the fact-checker confirmed this exact factual content is accurate:\n"${corrections[corrections.length - 1]}"\n\nThis seed IS your Part 1. Do not add to it, expand it, or introduce any new factual claims. Your entire job is to append a closing phrase of 40 to 60 characters that puts the reader physically at the place — a sensory or observational statement only. The total description (seed + closing) must be between 220 and 265 characters. Write nothing else.`
+    ? `\n\nVERIFIED FACTUAL SEED: A previous attempt failed but the fact-checker confirmed this exact factual content is accurate:\n"${corrections[corrections.length - 1]}"\n\nThis seed IS your factual basis. Do not contradict it or add unverifiable claims. If the seed is shorter than 140 characters, expand it with one additional well-documented detail about the same aspect of this place to reach the target length. The total description must be between 160 and 220 characters.`
     : '';
 
   const retryHint = allErrors.length > 0 && corrections.length === 0
@@ -720,6 +720,7 @@ Respond ONLY with valid JSON, no markdown:
   const verifyRaw = await callClaude(`You are a fact-checker. Assess this specific verifiable claim:
 
 Claim: "${parsed.key_claim}"
+Full description: "${fact}"
 Context (place): "${place}"
 
 Classify into one of three categories:
@@ -729,10 +730,16 @@ Classify into one of three categories:
 
 CRITICAL rule on numbers: if the claim contains a specific quantity and that exact figure is not confirmed in multiple reliable sources, classify as WRONG, not AMBIGUOUS. An unverifiable specific number is a fabricated statistic.
 
+BANNED CONTENT CHECK: Also classify as WRONG if the full description touches on any of these banned categories, regardless of factual accuracy:
+- Death, human remains, bones, burials, cemeteries, mass graves, executions or casualties
+- Disasters, famines, epidemics or atrocities
+Stamp descriptions must make someone want to visit a place. Content about death or tragedy must be rejected even if factually correct.
+
 Rules:
 - AMBIGUOUS is only for genuine minor date or phrasing uncertainty, not for unconfirmed quantities
 - Use WRONG for any specific figure that appears estimated or unverifiable
-- If WRONG, provide the corrected version in the correction field. If a number is the problem, suggest a version without it.
+- Use WRONG for any description touching banned content categories above
+- If WRONG, provide the corrected version in the correction field. If banned content is the problem, say "Choose a different angle about this place that does not involve death, remains or tragedy."
 
 Respond ONLY with valid JSON, no markdown:
 {"status": "CORRECT|AMBIGUOUS|WRONG", "note": "brief explanation", "correction": "corrected claim or empty string"}`, 400);
@@ -809,7 +816,7 @@ function renderFactCard(container, place, result, prefix) {
       </span>
       <span class="fact-type-label">Stamp description</span>
     </div>
-    <div class="fact-stamp-intro">You got this stamp by visiting ${esc(place)}.</div>
+    <div class="fact-stamp-intro">You got this stamp by visiting ${esc(place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' '))}.</div>
     <div class="fact-text">${esc(result.fact)}</div>
     <div class="fact-foot">
       <span class="char-count">${result.fact.length} chars</span>
@@ -850,7 +857,7 @@ function handleCardClick(e) {
 
   if (action === 'copy-fact' && stored) {
     const fullText = stored.place
-      ? `You got this stamp by visiting ${stored.place}.\n\n${stored.fact}`
+      ? `You got this stamp by visiting ${stored.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ')}.\n\n${stored.fact}`
       : stored.fact;
     copyToClipboard(fullText, btn);
   }
@@ -1187,7 +1194,7 @@ function exportBatchXLSX() {
     const rows = [headerRow];
     results.forEach((r, i) => {
       const extras = seenHeaders.map(h => extraColsByResult[i][h] || '');
-      const stampIntro = r.fact ? `You got this stamp by visiting ${r.place}.` : '';
+      const stampIntro = r.fact ? `You got this stamp by visiting ${r.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ')}.` : '';
       if (r.fact) {
         const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
         rows.push([r.place, r.country||'', ...extras, stampIntro, r.fact, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
@@ -1344,7 +1351,7 @@ function exportSessionCSV(sessionId, sessionDate) {
   const rows = [['Place', 'Country', 'Stamp Intro', 'Stamp Description', 'Char Count', 'Status', 'Source 1', 'Source 2', 'Source 3']];
   records.forEach(r => {
     const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
-    const stampIntro = r.fact ? `You got this stamp by visiting ${r.place}.` : '';
+    const stampIntro = r.fact ? `You got this stamp by visiting ${r.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ')}.` : '';
     rows.push([r.place, r.country||'', stampIntro, r.fact||'', (r.fact||'').length, r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
   });
   // Label filename with session datetime
@@ -1358,7 +1365,7 @@ function exportHistoryCSV() {
   const rows = [['Place', 'Country', 'Stamp Intro', 'Stamp Description', 'Char Count', 'Session', 'Date', 'Status', 'Source 1', 'Source 2', 'Source 3']];
   records.forEach(r => {
     const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
-    const stampIntro = r.fact ? `You got this stamp by visiting ${r.place}.` : '';
+    const stampIntro = r.fact ? `You got this stamp by visiting ${r.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ')}.` : '';
     const sessionLabel = r.sessionId ? fmtDate(new Date(parseInt(r.sessionId.replace('session_',''))).toISOString()) : 'Legacy';
     rows.push([r.place, r.country||'', stampIntro, r.fact||'', (r.fact||'').length, sessionLabel, fmtDate(r.date), r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
   });
