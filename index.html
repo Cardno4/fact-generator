@@ -151,6 +151,7 @@
       background: #e8f4e8; color: #1a6b3a; border-radius: 999px; padding: 3px 10px;
       display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
     }
+    .fact-stamp-intro { font-size: 13px; color: #888; font-style: italic; margin-bottom: 8px; }
     .fact-type-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #aaa; }
     .fact-text { font-size: 15px; line-height: 1.65; color: #1a1a1a; margin-bottom: 12px; }
     .fact-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -289,7 +290,7 @@
   <div class="topbar">
     <div class="topbar-left">
       <h1>Fact Generator</h1>
-      <p>One verified stamp description (180–260 chars, target 220–250) per place — factual kernel confirmed before display</p>
+      <p>One verified stamp description per place — shown with stamp framing line, factual claim confirmed before display</p>
     </div>
     <div class="topbar-right">
       <span class="key-pill" id="key-pill"></span>
@@ -413,9 +414,9 @@ const ICON_LETTER = ['W', 'O', 'N'];
 // ── Fact store (prefix → {fact, sources}) ────────────────────────────────────
 const FACT_STORE = {};
 let factStoreCounter = 0;
-function storeFact(fact, sources) {
+function storeFact(fact, sources, place) {
   const id = ++factStoreCounter;
-  FACT_STORE[id] = { fact, sources };
+  FACT_STORE[id] = { fact, sources, place };
   return id;
 }
 function getStored(id) { return FACT_STORE[id] || null; }
@@ -599,54 +600,41 @@ async function generateCandidateFact(place, lastError = '', allErrors = [], corr
     ? `\n\nIMPORTANT: your previous ${allErrors.length} attempt(s) failed. Full rejection history:\n${allErrors.map((e, i) => `Attempt ${i+1}: ${e}`).join('\n')}\n\nYou must produce something genuinely different from all previous attempts. Rules:\n- If any error mentions an em dash, rewrite entirely without that character.\n- If an error says "too long", your next description must be noticeably shorter. If it says "too short", make it longer.\n- If a specific claim was already rejected, do not try any version of it again. That entire angle is closed.\n- If the same category of fact has failed more than once, move to a completely different category.\n- Choose a fact from a different aspect of the place entirely: if geography failed, try architecture; if construction failed, try cultural history; if a food story failed, try the building's age or neighbourhood.`
     : '';
 
-  const raw = await callClaude(`You are a writer creating stamp descriptions for a passport collectible app. Each description covers a real place and follows a strict two-part hybrid format:
+  const raw = await callClaude(`You are a writer creating stamp descriptions for a passport collectible app. Each description is a single, self-contained factual sentence about a real place.
 
-PART 1: A surprising, specific, true detail about the place. Something that makes a well-travelled person picture it, feel its scale, or understand its character. It must be a real, verifiable fact, not a vague generalisation.
-PART 2: A closing phrase that lands the detail with a sense of what it feels like to be there. It must put the reader at the place, not just add a comparative footnote. It must be SPECIFIC to this place.
+FORMAT: One sentence. Factual. Specific. Surprising. No closing sentiment, no evocative flourish, no "and you can feel it today" type endings. The sentence ends when the fact ends.
 
-The two parts must flow as a single natural sentence joined by a conjunction, comma, or relative clause.
+The stamp card already tells the user they visited this place. Your job is only to give them one genuinely interesting true thing about it.
 
-EM DASH RULE: The character (—) is strictly forbidden. Do not use it anywhere in the description under any circumstances. Use "and", "but", "yet", "where", "which", "whose", "leaving", "making" or a comma instead.
+EM DASH RULE: The character (—) is strictly forbidden. Do not use it anywhere.
 
-TARGET LENGTH: 220 to 250 characters. Hard minimum: 180. Hard maximum: 265. Do not stop early. Use the full range to make the description vivid and complete.
+TARGET LENGTH: 160 to 220 characters. Hard minimum: 140. Hard maximum: 230. The sentence should be as long as it needs to be to state the fact clearly and specifically, and no longer.
 
 Place: "${place}"
 
-GOOD EXAMPLES (200+ characters, no em dashes, makes you feel present at the place):
-- "Built at four and a half floors per week and finished 45 days ahead of schedule during the Great Depression, the Empire State Building rose faster than New York itself expected, and still defines what a city can look like." (222 chars)
-- "The Eiffel Tower was nearly demolished in 1909 when its lease expired, saved only because its antenna proved useful for military radio transmissions, coming within months of never existing at all." (196 chars)
-- "Machu Picchu sits at 2,430 metres above sea level, hidden in cloud forest so dense that Spanish conquistadors never found it, leaving its existence unknown to the outside world for over 300 years." (197 chars)
-- "DUMBO's cobblestone streets were laid with ballast stones carried by 18th-century cargo ships from Europe, dumped in Brooklyn's harbour after long Atlantic voyages and repurposed as roads beneath the bridges." (208 chars)
-- "Stuttgart was founded as a stud farm in the 10th century, its name meaning mare garden in Old German, and its coat of arms still bears a black horse on gold after more than a thousand years." (191 chars)
+GOOD EXAMPLES (factual, specific, no closing sentiment):
+- "The Empire State Building was constructed in just 410 days, with crews working in shifts around the clock and finishing 45 days ahead of schedule during the height of the Great Depression." (188 chars)
+- "The Eiffel Tower was nearly demolished in 1909 when its original 20-year lease expired, and was saved only because its antenna had become essential for military radio communications." (181 chars)
+- "Machu Picchu sits at 2,430 metres above sea level and was never discovered by Spanish conquistadors, remaining unknown to the outside world until Hiram Bingham documented it in 1911." (182 chars)
+- "DUMBO's cobblestone streets were laid with ballast stones carried by 18th-century European cargo ships and dumped in Brooklyn harbour after Atlantic crossings." (158 chars)
+- "Wales has more castles per square mile than any other country in Europe, with over 600 medieval fortifications built by Welsh princes and Norman lords across its valleys and coastline." (183 chars)
 
-BANNED: the character (—). Every single example above connects its two parts without using it. So must you.
+BAD EXAMPLES (do not produce these):
+- "...and you can still feel the history underfoot today." (invented sentiment)
+- "...where the past and present meet." (generic filler)
+- "...a place that has never forgotten its origins." (vague)
+- "...making it one of the most visited places on earth." (cliché)
 
-BANNED CLOSING PHRASES (never use these or anything like them):
-- "...and it has defined the skyline ever since"
-- "...a place unlike any other"
-- "...it remains one of the world's great landmarks"
-- "...and its legacy endures to this day"
-- "...a testament to human achievement"
-- "...that continues to inspire millions"
-- "...making it truly unforgettable"
-- "...a land smaller than [another country or US state]"
-- Any closing that could apply to more than 10 places on earth
-- Any closing that is a comparative statistic rather than a sense of place
-
-The closing phrase must answer: "what does it feel like to stand here, knowing this?" not "how does this compare to something else?"
-
-CLOSING CLAUSE ACCURACY: The closing phrase must be as factually grounded as Part 1. Do not invent claims in the closing that were not established in Part 1. "where no one has ever built a home" or "that no map had ever recorded" are examples of invented closing claims that sound evocative but are false. If you cannot verify the closing claim, use a sensory or observational statement instead ("where the Atlantic horizon fills every window", "where the original stonework is still underfoot").
-
-BANNED FACT CATEGORIES (never use facts from these areas):
+BANNED FACT CATEGORIES:
 - Politics, elections, voting systems or political parties
 - Laws, legislation, legal rulings or criminal justice policy
 - Drug policy, healthcare policy or social welfare programmes
 - Military spending, defence policy or treaties
 - Economic policy, tax systems or trade agreements
 - Immigration or citizenship rules
-- Death, human remains, burials, cemeteries, executions, disasters or tragedies. The tone must make someone want to visit, not feel unsettled. If a place has a famous dark history, choose a different angle entirely.
+- Death, human remains, burials, cemeteries, executions, disasters or tragedies
 
-PREFERRED FACT CATEGORIES (always draw from these):
+PREFERRED FACT CATEGORIES:
 - Geography: size, position, borders, terrain, coastline, elevation, rivers, islands
 - Natural world: climate records, wildlife, geology, ecosystems, natural phenomena
 - Architecture and engineering: construction records, materials, scale, structural facts
@@ -655,33 +643,31 @@ PREFERRED FACT CATEGORIES (always draw from these):
 - Physical records: oldest, largest, deepest, highest, longest, specific and measurable
 
 RULES FOR NUMBERS AND QUANTITIES:
-- Only include a specific number, measurement or quantity if it is well-documented enough to appear in multiple encyclopaedia-level sources
-- If you are not certain a specific number is confirmed, describe the fact WITHOUT the number rather than inventing one
-- Saying "one of the longest" or "built in under a year" is fine. Inventing a precise figure is not.
+- Only use a specific number if it is well-documented in multiple encyclopaedia-level sources
+- If uncertain, describe the fact without the number rather than inventing one
 
 PLACE TYPE GUIDANCE:
-- COUNTRY: geographic, natural, exploratory or cultural record. Never a policy or political fact.
+- COUNTRY: geographic, natural, exploratory or cultural record. Never policy or political.
 - CITY: founding story, urban record, surprising structural or geographic fact
-- STREET or AVENUE: focus on a famous historical event, a notable building or resident, or a cultural moment associated with this street. Do NOT use measurable claims like length, width, or property values, as these are consistently disputed across sources and will fail verification. Use narrative instead.
+- STREET or AVENUE: a famous historical event, notable resident, or cultural moment. No measurable claims like length or property values as these are disputed and fail verification.
 - BUILDING or LANDMARK: construction, engineering, or record-breaking detail
-- MUSEUM or INSTITUTION: collection size, founding story, record-breaking or surprising acquisition
-- PARK or NATURE: scale, age, geological or ecological surprise. If using a construction statistic, prefer well-documented round figures (e.g. "843 acres") over process quantities (e.g. "10 million cartloads") which are rarely verifiable.
-- ISLAND or ARCHIPELAGO: geological origin, coral reef facts, cultural history of settlement, or a well-documented geographic record. Avoid date line and meridian claims as these are frequently imprecise. Avoid island count claims where the inhabited/uninhabited split is disputed.
+- MUSEUM or INSTITUTION: collection size, founding story, or a well-documented record
+- PARK or NATURE: scale, age, geological or ecological fact. Use documented figures like acreage, not process quantities like cartloads.
+- ISLAND or ARCHIPELAGO: geological origin, coral reef facts, or well-documented geographic record. Avoid date line and meridian claims as these are frequently imprecise.
 - NEIGHBOURHOOD or DISTRICT: origin story, transformation, cultural record${retryHint}${correctionSeed}
 
 Respond ONLY with valid JSON, no markdown:
 {"fact":"the description here","country":"Full country name, e.g. United States of America"}`);
   const parsed = JSON.parse(raw);
 
-  // Hard reject: any em dash in the output triggers an immediate retry
   if (parsed.fact && parsed.fact.includes('\u2014')) {
-    throw new Error(`Description contains a banned em dash character. Rewrite the sentence entirely without using it.`);
+    throw new Error(`Description contains a banned em dash character. Rewrite without using it.`);
   }
 
-  if (!parsed.fact || parsed.fact.length < 180 || parsed.fact.length > 265) {
+  if (!parsed.fact || parsed.fact.length < 140 || parsed.fact.length > 230) {
     const len = parsed.fact?.length;
-    const dir = len > 265 ? `too long at ${len} chars, cut it down` : `too short at ${len} chars, expand it`;
-    throw new Error(`Description length out of range: ${dir}. Target is 220 to 250 characters, minimum 180, maximum 265.`);
+    const dir = len > 230 ? `too long at ${len} chars, cut it down` : `too short at ${len} chars, expand it`;
+    throw new Error(`Description length out of range: ${dir}. Target is 160 to 220 characters, minimum 140, maximum 230.`);
   }
   return { fact: parsed.fact, country: parsed.country || '' };
 }
@@ -730,32 +716,26 @@ Respond ONLY with valid JSON, no markdown:
     iconLetter: ICON_LETTER[j] || '?'
   }));
 
-  // Second pass: verify the factual kernel AND check the closing clause for invented claims
-  const verifyRaw = await callClaude(`You are a fact-checker. You have two jobs:
+  // Second pass: verify the factual kernel
+  const verifyRaw = await callClaude(`You are a fact-checker. Assess this specific verifiable claim:
 
-JOB 1: Assess this specific verifiable claim extracted from a stamp description:
 Claim: "${parsed.key_claim}"
 Context (place): "${place}"
 
 Classify into one of three categories:
 1. CORRECT: factually accurate and well-documented in multiple reliable sources
 2. AMBIGUOUS: the core event or detail is real and documented, but a minor surrounding detail (e.g. exact day of month, year varying by 1 to 2 across sources) is uncertain. The substance is not wrong, just slightly imprecise.
-3. WRONG: contains a clear factual error, OR includes a specific number or quantity or measurement that cannot be independently confirmed in encyclopaedia-level sources
+3. WRONG: contains a clear factual error, OR includes a specific number or quantity that cannot be independently confirmed in encyclopaedia-level sources
 
-CRITICAL rule on numbers: if the claim contains a specific quantity (e.g. "30,000 pounds", "80 percent", "2 million visitors") and that exact figure is not confirmed in multiple reliable sources, classify as WRONG, not AMBIGUOUS. An unverifiable specific number is not a minor imprecision, it is a fabricated statistic.
-
-JOB 2: Check the full description for invented closing claims.
-Full description: "${fact}"
-
-Look at the closing phrase (the second half of the sentence after the main fact). Flag it as CLOSING_INVENTED if it makes a factual claim that is not established in the first half and cannot be independently verified. Examples of invented closing claims: "where no one has ever built a home", "that no map had ever recorded", "mailing thousands of care packages each year". Sensory or observational closings are fine: "where the original stonework is still underfoot", "where the Atlantic horizon fills every window".
+CRITICAL rule on numbers: if the claim contains a specific quantity and that exact figure is not confirmed in multiple reliable sources, classify as WRONG, not AMBIGUOUS. An unverifiable specific number is a fabricated statistic.
 
 Rules:
 - AMBIGUOUS is only for genuine minor date or phrasing uncertainty, not for unconfirmed quantities
-- Use WRONG for any specific figure that appears estimated, approximate or unverifiable
-- If WRONG or CLOSING_INVENTED, provide the corrected version in the correction field.
+- Use WRONG for any specific figure that appears estimated or unverifiable
+- If WRONG, provide the corrected version in the correction field. If a number is the problem, suggest a version without it.
 
 Respond ONLY with valid JSON, no markdown:
-{"status": "CORRECT|AMBIGUOUS|WRONG", "closing_ok": true, "note": "brief explanation", "correction": "corrected claim or empty string"}`, 500);
+{"status": "CORRECT|AMBIGUOUS|WRONG", "note": "brief explanation", "correction": "corrected claim or empty string"}`, 400);
 
   const verifyResult = JSON.parse(verifyRaw);
 
@@ -763,13 +743,6 @@ Respond ONLY with valid JSON, no markdown:
     const correction = verifyResult.correction ? ` Corrected version: "${verifyResult.correction}"` : '';
     const err = new Error(`Factual claim is incorrect: ${verifyResult.note}${correction}`);
     err.rejectionType = 'factual_error';
-    throw err;
-  }
-
-  if (verifyResult.closing_ok === false) {
-    const correction = verifyResult.correction ? ` Suggested fix: "${verifyResult.correction}"` : '';
-    const err = new Error(`Closing clause contains an invented claim: ${verifyResult.note}${correction}`);
-    err.rejectionType = 'invented_closing';
     throw err;
   }
 
@@ -810,7 +783,7 @@ async function generateAndVerify(place, onStatusUpdate) {
 
 // ── Render a verified fact card ───────────────────────────────────────────────
 function renderFactCard(container, place, result, prefix) {
-  const storeId = storeFact(result.fact, result.sources);
+  const storeId = storeFact(result.fact, result.sources, place);
 
   const card = document.createElement('div');
   card.className = 'fact-card';
@@ -836,6 +809,7 @@ function renderFactCard(container, place, result, prefix) {
       </span>
       <span class="fact-type-label">Stamp description</span>
     </div>
+    <div class="fact-stamp-intro">You got this stamp by visiting ${esc(place)}.</div>
     <div class="fact-text">${esc(result.fact)}</div>
     <div class="fact-foot">
       <span class="char-count">${result.fact.length} chars</span>
@@ -846,10 +820,10 @@ function renderFactCard(container, place, result, prefix) {
       <button class="copy-fact-btn" data-action="copy-fact" data-store-id="${storeId}">Copy</button>
     </div>
     <div class="sources-panel" id="sources-${prefix}">
-      <div class="sources-heading">Sources used to verify this fact</div>
+      <div class="sources-heading">Sources used to verify this description</div>
       <div class="source-links">${sourcesHtml}</div>
       ${result.isAmbiguous ? `<p class="sources-note" style="color:#b06000;background:#fef3e2;border-radius:6px;padding:8px 10px;margin-bottom:8px">⚠ Minor ambiguity: ${esc(result.verifyNote)} The core fact is correct but a specific detail may vary across sources.</p>` : ''}
-      <p class="sources-note">Each link opens a targeted Google search. The factual claim in this description was automatically verified against these sources before being shown to you.</p>
+      <p class="sources-note">Each link opens a targeted Google search. The factual claim was automatically verified against these sources before being shown to you.</p>
     </div>`;
 
   container.innerHTML = '';
@@ -875,7 +849,10 @@ function handleCardClick(e) {
   }
 
   if (action === 'copy-fact' && stored) {
-    copyToClipboard(stored.fact, btn);
+    const fullText = stored.place
+      ? `You got this stamp by visiting ${stored.place}.\n\n${stored.fact}`
+      : stored.fact;
+    copyToClipboard(fullText, btn);
   }
 
   if (action === 'db-export-session') {
@@ -1197,6 +1174,7 @@ function exportBatchXLSX() {
       'Place',
       'Country',
       ...seenHeaders,
+      'Stamp Intro',
       'Stamp Description',
       'Char Count',
       'Status',
@@ -1209,21 +1187,22 @@ function exportBatchXLSX() {
     const rows = [headerRow];
     results.forEach((r, i) => {
       const extras = seenHeaders.map(h => extraColsByResult[i][h] || '');
+      const stampIntro = r.fact ? `You got this stamp by visiting ${r.place}.` : '';
       if (r.fact) {
         const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
-        rows.push([r.place, r.country||'', ...extras, r.fact, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
+        rows.push([r.place, r.country||'', ...extras, stampIntro, r.fact, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
       } else {
-        rows.push([r.place, r.country||'', ...extras, '', '', 'Failed', r.error||'Could not produce a verified description after 3 attempts', '', '', '']);
+        rows.push([r.place, r.country||'', ...extras, '', '', '', 'Failed', r.error||'Could not produce a verified description after 4 attempts', '', '', '']);
       }
     });
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
 
-    // Set column widths for readability
     ws['!cols'] = [
       { wch: 30 },  // Place
       { wch: 24 },  // Country
       ...seenHeaders.map(() => ({ wch: 20 })),
+      { wch: 40 },  // Stamp Intro
       { wch: 70 },  // Stamp Description
       { wch: 10 },  // Char Count
       { wch: 10 },  // Status
@@ -1362,10 +1341,11 @@ function clearHistory() {
 function exportSessionCSV(sessionId, sessionDate) {
   const records = dbLoad().filter(r => (r.sessionId || 'legacy') === sessionId);
   if (!records.length) { alert('No entries found for this session.'); return; }
-  const rows = [['Place', 'Country', 'Date', 'Stamp Description', 'Char Count', 'Status', 'Source 1', 'Source 2', 'Source 3']];
+  const rows = [['Place', 'Country', 'Stamp Intro', 'Stamp Description', 'Char Count', 'Status', 'Source 1', 'Source 2', 'Source 3']];
   records.forEach(r => {
     const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
-    rows.push([r.place, r.country||'', fmtDate(r.date), r.fact||'', (r.fact||'').length, r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
+    const stampIntro = r.fact ? `You got this stamp by visiting ${r.place}.` : '';
+    rows.push([r.place, r.country||'', stampIntro, r.fact||'', (r.fact||'').length, r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
   });
   // Label filename with session datetime
   const dateSlug = sessionDate ? new Date(sessionDate).toISOString().replace(/[:.]/g,'-').substring(0,19) : 'session';
@@ -1375,11 +1355,12 @@ function exportSessionCSV(sessionId, sessionDate) {
 function exportHistoryCSV() {
   const records = dbLoad();
   if (!records.length) { alert('No history to export.'); return; }
-  const rows = [['Place', 'Country', 'Session', 'Date', 'Stamp Description', 'Char Count', 'Status', 'Source 1', 'Source 2', 'Source 3']];
+  const rows = [['Place', 'Country', 'Stamp Intro', 'Stamp Description', 'Char Count', 'Session', 'Date', 'Status', 'Source 1', 'Source 2', 'Source 3']];
   records.forEach(r => {
     const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
+    const stampIntro = r.fact ? `You got this stamp by visiting ${r.place}.` : '';
     const sessionLabel = r.sessionId ? fmtDate(new Date(parseInt(r.sessionId.replace('session_',''))).toISOString()) : 'Legacy';
-    rows.push([r.place, r.country||'', sessionLabel, fmtDate(r.date), r.fact||'', (r.fact||'').length, r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
+    rows.push([r.place, r.country||'', stampIntro, r.fact||'', (r.fact||'').length, sessionLabel, fmtDate(r.date), r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
   });
   downloadCSV(rows, 'facts-history-all.csv');
 }
