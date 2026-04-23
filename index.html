@@ -592,7 +592,7 @@ async function callClaude(prompt, maxTokens=800) {
 async function generateCandidateFact(place, lastError = '', allErrors = [], corrections = []) {
   // If the verifier provided a corrected factual seed, use it directly as the mandatory basis
   const correctionSeed = corrections.length > 0
-    ? `\n\nVERIFIED FACTUAL SEED: A previous attempt was rejected but the fact-checker provided this verified factual basis. You MUST build your description around it:\n"${corrections[corrections.length - 1]}"\nKeep the factual content exactly as stated. Your only job is to add a specific, grounded closing phrase that puts the reader at the place. Do not invent new facts or add unverifiable details.`
+    ? `\n\nVERIFIED FACTUAL SEED: A previous attempt failed but the fact-checker confirmed this exact factual content is accurate:\n"${corrections[corrections.length - 1]}"\n\nThis seed IS your Part 1. Do not add to it, expand it, or introduce any new factual claims. Your entire job is to append a closing phrase of 40 to 60 characters that puts the reader physically at the place — a sensory or observational statement only. The total description (seed + closing) must be between 220 and 265 characters. Write nothing else.`
     : '';
 
   const retryHint = allErrors.length > 0 && corrections.length === 0
