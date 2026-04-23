@@ -190,6 +190,9 @@
 
     /* Place group (batch) */
     .place-group { margin-bottom: 2rem; }
+    .retry-btn { font-size: 12px; padding: 5px 14px; border: 1px solid #ddd; border-radius: 8px; background: #fff; cursor: pointer; color: #555; margin-top: 10px; display: inline-flex; align-items: center; gap: 6px; }
+    .retry-btn:hover { background: #f5f5f5; border-color: #aaa; }
+    .retry-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .place-heading { font-size: 13px; font-weight: 600; color: #555; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
     .place-num { width: 22px; height: 22px; border-radius: 50%; background: #1a1a1a; color: #fff; font-size: 11px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
@@ -891,11 +894,70 @@ function handleCardClick(e) {
 }
 
 // ── Single generate ───────────────────────────────────────────────────────────
+// ── Per-item generation (used by batch run and retry buttons) ─────────────────
+async function generateItemAt(i, place, group) {
+  // Show loading state inside the group
+  const loadingEl = document.createElement('div');
+  loadingEl.className = 'loading';
+  loadingEl.id = `group-loading-${i}`;
+  loadingEl.style.cssText = 'padding:1rem 0;font-size:13px';
+  loadingEl.innerHTML = `Generating &amp; verifying description${dots()}<div class="loading-step"></div>`;
+
+  // Replace whatever is currently in the result slot
+  const existing = group.querySelector('.fact-card, .item-error');
+  if (existing) existing.replaceWith(loadingEl);
+  else group.appendChild(loadingEl);
+
+  try {
+    const result = await generateAndVerify(place, (msg, attempt) => {
+      const el = document.getElementById(`group-loading-${i}`);
+      if (el) el.innerHTML = `${esc(msg)}${dots()}<div class="loading-step">${attempt>1?'Attempt '+attempt+' of '+MAX_RETRIES:''}</div>`;
+    });
+
+    batchResults[i].fact = result.fact;
+    batchResults[i].country = result.country;
+    batchResults[i].sources = result.sources;
+    batchResults[i].error = null;
+
+    const factDiv = document.createElement('div');
+    renderFactCard(factDiv, place, result, `b${i}`);
+    const loading = document.getElementById(`group-loading-${i}`);
+    if (loading) loading.replaceWith(factDiv.firstChild);
+    dbAddEntry(place, result.fact, result.sources, CURRENT_SESSION_ID, result.country);
+    updateBadge();
+
+  } catch(e) {
+    batchResults[i].error = e.message;
+    const errDiv = document.createElement('div');
+    errDiv.className = 'item-error';
+    errDiv.style.cssText = 'font-size:13px;color:#c00;padding:8px 0';
+    errDiv.innerHTML = `<strong>Could not verify a description for this place.</strong><br>
+      <span style="color:#aaa;font-size:12px">${esc(e.message)}</span><br>
+      <button class="retry-btn" onclick="retryItem(${i})">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M13.5 2.5A6.5 6.5 0 1 1 7 1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><polyline points="10 1 7 1 7 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Try again
+      </button>`;
+    const loading = document.getElementById(`group-loading-${i}`);
+    if (loading) loading.replaceWith(errDiv);
+    else group.appendChild(errDiv);
+  }
+}
+
+// ── Retry a single batch item by index ────────────────────────────────────────
+async function retryItem(i) {
+  const item = batchResults[i];
+  if (!item) return;
+  const group = document.getElementById(`group-${i}`);
+  if (!group) return;
+  const btn = group.querySelector('.retry-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Retrying…'; }
+  await generateItemAt(i, item.place, group);
+}
+
 async function generateSingle() {
   const q = document.getElementById('q').value.trim();
   if (!q) return;
 
-  // New session ID for this run
   CURRENT_SESSION_ID = 'session_' + Date.now();
 
   const btn = document.getElementById('btn-single');
@@ -921,7 +983,11 @@ async function generateSingle() {
   } catch(e) {
     results.innerHTML = `<div class="error-msg">
       ${esc(e.message)}<br>
-      <small style="color:#aaa;margin-top:6px;display:block">This usually means no verifiable surprising detail could be confirmed for this place. Try being more specific — e.g. a named building or landmark rather than a broad area.</small>
+      <small style="color:#aaa;margin-top:6px;display:block">No verifiable description could be confirmed. Try being more specific — e.g. a named building or landmark rather than a broad area.</small>
+      <button class="retry-btn" style="margin-top:12px" onclick="generateSingle()">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M13.5 2.5A6.5 6.5 0 1 1 7 1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><polyline points="10 1 7 1 7 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Try again
+      </button>
     </div>`;
   }
 
@@ -1100,38 +1166,11 @@ async function generateBatch() {
 
     const group = document.createElement('div');
     group.className = 'place-group'; group.id = `group-${i}`;
-    group.innerHTML = `
-      <div class="place-heading"><div class="place-num">${i+1}</div><span>${esc(place)}</span></div>
-      <div class="loading" id="group-loading-${i}" style="padding:1rem 0;font-size:13px">
-        Generating &amp; verifying description${dots()}
-        <div class="loading-step" id="group-step-${i}"></div>
-      </div>`;
+    group.innerHTML = `<div class="place-heading"><div class="place-num">${i+1}</div><span>${esc(place)}</span></div>`;
     container.appendChild(group);
     group.scrollIntoView({ behavior:'smooth', block:'nearest' });
 
-    try {
-      const result = await generateAndVerify(place, (msg, attempt) => {
-        const el = document.getElementById(`group-loading-${i}`);
-        const step = document.getElementById(`group-step-${i}`);
-        if (el) el.innerHTML = `${esc(msg)}${dots()}<div class="loading-step">${attempt>1?'Attempt '+attempt+' of '+MAX_RETRIES:''}</div>`;
-      });
-
-      batchResults[i].fact = result.fact;
-      batchResults[i].country = result.country;
-      batchResults[i].sources = result.sources;
-
-      const factDiv = document.createElement('div');
-      renderFactCard(factDiv, place, result, `b${i}`);
-      group.querySelector(`#group-loading-${i}`).replaceWith(factDiv.firstChild);
-      dbAddEntry(place, result.fact, result.sources, CURRENT_SESSION_ID, result.country);
-
-    } catch(e) {
-      batchResults[i].error = e.message;
-      const errDiv = document.createElement('div');
-      errDiv.style.cssText = 'font-size:13px;color:#c00;padding:8px 0';
-      errDiv.innerHTML = `<strong>Could not verify a fact for this place.</strong><br><span style="color:#aaa">${esc(e.message)}</span>`;
-      group.querySelector(`#group-loading-${i}`).replaceWith(errDiv);
-    }
+    await generateItemAt(i, place, group);
     if (i < allPlaces.length-1) await sleep(600);
   }
 
