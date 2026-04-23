@@ -1221,7 +1221,6 @@ function exportBatchXLSX() {
       'Place',
       'Country',
       ...seenHeaders,
-      'Stamp Intro',
       'Stamp Description',
       'Char Count',
       'Status',
@@ -1234,12 +1233,13 @@ function exportBatchXLSX() {
     const rows = [headerRow];
     results.forEach((r, i) => {
       const extras = seenHeaders.map(h => extraColsByResult[i][h] || '');
-      const stampIntro = r.fact ? `You got this stamp by visiting ${r.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ')}.` : '';
+      const capPlace = r.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
       if (r.fact) {
+        const fullDesc = `You got this stamp by visiting ${capPlace}.\n\n${r.fact}`;
         const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
-        rows.push([r.place, r.country||'', ...extras, stampIntro, r.fact, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
+        rows.push([r.place, r.country||'', ...extras, fullDesc, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
       } else {
-        rows.push([r.place, r.country||'', ...extras, '', '', '', 'Failed', r.error||'Could not produce a verified description after 4 attempts', '', '', '']);
+        rows.push([r.place, r.country||'', ...extras, '', '', 'Failed', r.error||'Could not produce a verified description after 4 attempts', '', '', '']);
       }
     });
 
@@ -1249,8 +1249,7 @@ function exportBatchXLSX() {
       { wch: 30 },  // Place
       { wch: 24 },  // Country
       ...seenHeaders.map(() => ({ wch: 20 })),
-      { wch: 40 },  // Stamp Intro
-      { wch: 70 },  // Stamp Description
+      { wch: 80 },  // Stamp Description (merged)
       { wch: 10 },  // Char Count
       { wch: 10 },  // Status
       { wch: 40 },  // Failure Reason
@@ -1258,6 +1257,17 @@ function exportBatchXLSX() {
       { wch: 50 },  // Source 2
       { wch: 50 },  // Source 3
     ];
+
+    // Apply wrap text to the Stamp Description column so \n renders in Excel
+    const descColIndex = 2 + seenHeaders.length; // Place, Country, ...extras, then desc
+    Object.keys(ws).forEach(addr => {
+      if (addr[0] === '!') return;
+      const col = XLSX.utils.decode_cell(addr).c;
+      if (col === descColIndex) {
+        if (!ws[addr].s) ws[addr].s = {};
+        ws[addr].s.alignment = { wrapText: true, vertical: 'top' };
+      }
+    });
 
     // Sanitise sheet name — Excel limits to 31 chars, no special chars
     const safeName = sheetName.replace(/[:\\\/\?\*\[\]]/g, '').substring(0, 31);
@@ -1388,11 +1398,12 @@ function clearHistory() {
 function exportSessionCSV(sessionId, sessionDate) {
   const records = dbLoad().filter(r => (r.sessionId || 'legacy') === sessionId);
   if (!records.length) { alert('No entries found for this session.'); return; }
-  const rows = [['Place', 'Country', 'Stamp Intro', 'Stamp Description', 'Char Count', 'Status', 'Source 1', 'Source 2', 'Source 3']];
+  const rows = [['Place', 'Country', 'Stamp Description', 'Char Count', 'Status', 'Source 1', 'Source 2', 'Source 3']];
   records.forEach(r => {
     const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
-    const stampIntro = r.fact ? `You got this stamp by visiting ${r.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ')}.` : '';
-    rows.push([r.place, r.country||'', stampIntro, r.fact||'', (r.fact||'').length, r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
+    const capPlace = r.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
+    const fullDesc = r.fact ? `You got this stamp by visiting ${capPlace}.\n\n${r.fact}` : '';
+    rows.push([r.place, r.country||'', fullDesc, (r.fact||'').length, r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
   });
   // Label filename with session datetime
   const dateSlug = sessionDate ? new Date(sessionDate).toISOString().replace(/[:.]/g,'-').substring(0,19) : 'session';
@@ -1402,12 +1413,14 @@ function exportSessionCSV(sessionId, sessionDate) {
 function exportHistoryCSV() {
   const records = dbLoad();
   if (!records.length) { alert('No history to export.'); return; }
-  const rows = [['Place', 'Country', 'Stamp Intro', 'Stamp Description', 'Char Count', 'Session', 'Date', 'Status', 'Source 1', 'Source 2', 'Source 3']];
+  const rows = [['Place', 'Country', 'Stamp Description', 'Char Count', 'Session', 'Date', 'Status', 'Source 1', 'Source 2', 'Source 3']];
   records.forEach(r => {
     const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
-    const stampIntro = r.fact ? `You got this stamp by visiting ${r.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ')}.` : '';
+    const capPlace = r.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
+    const fullDesc = r.fact ? `You got this stamp by visiting ${capPlace}.\n\n${r.fact}` : '';
     const sessionLabel = r.sessionId ? fmtDate(new Date(parseInt(r.sessionId.replace('session_',''))).toISOString()) : 'Legacy';
-    rows.push([r.place, r.country||'', stampIntro, r.fact||'', (r.fact||'').length, sessionLabel, fmtDate(r.date), r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
+    rows.push([r.place, r.country||'', fullDesc, (r.fact||'').length, sessionLabel, fmtDate(r.date), r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
+  });
   });
   downloadCSV(rows, 'facts-history-all.csv');
 }
