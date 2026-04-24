@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Fact Generator</title>
+  <title>Fact Generator v28</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -292,7 +292,7 @@
 <div class="container" id="app-screen">
   <div class="topbar">
     <div class="topbar-left">
-      <h1>Fact Generator</h1>
+      <h1>Fact Generator <span style="font-size:13px;font-weight:400;color:#bbb;letter-spacing:0.02em">v28</span></h1>
       <p>One verified stamp description per place — shown with stamp framing line, factual claim confirmed before display</p>
     </div>
     <div class="topbar-right">
@@ -423,6 +423,17 @@ function storeFact(fact, sources, place) {
   return id;
 }
 function getStored(id) { return FACT_STORE[id] || null; }
+
+// ── Seen facts per place — prevents refresh returning the same description ────
+const SEEN_FACTS = {}; // place (lowercase) → [fact string, ...]
+function recordSeenFact(place, fact) {
+  const key = place.toLowerCase();
+  if (!SEEN_FACTS[key]) SEEN_FACTS[key] = [];
+  if (!SEEN_FACTS[key].includes(fact)) SEEN_FACTS[key].push(fact);
+}
+function getSeenFacts(place) {
+  return SEEN_FACTS[place.toLowerCase()] || [];
+}
 
 // ── State ────────────────────────────────────────────────────────────────────
 let SESSION_KEY = '';
@@ -593,14 +604,19 @@ async function callClaude(prompt, maxTokens=800) {
 }
 
 // ── Step 1: Generate candidate description ───────────────────────────────────
-async function generateCandidateFact(place, lastError = '', allErrors = [], corrections = []) {
+async function generateCandidateFact(place, lastError = '', allErrors = [], corrections = [], seenFacts = []) {
   // If the verifier provided a corrected factual seed, use it directly as the mandatory basis
   const correctionSeed = corrections.length > 0
     ? `\n\nVERIFIED FACTUAL SEED: A previous attempt failed but the fact-checker confirmed this exact factual content is accurate:\n"${corrections[corrections.length - 1]}"\n\nThis seed IS your factual basis. Do not contradict it or add unverifiable claims. If the seed is shorter than 150 characters, expand it with one additional well-documented detail about the same aspect of this place to reach the target length. The total description must be between 160 and 220 characters.`
     : '';
 
+  const seenHint = seenFacts.length > 0
+    ? '\n\nDO NOT REPEAT: The following descriptions have already been shown to the user for this place and must not be repeated or closely paraphrased. Choose a completely different angle, subject, or aspect of the place:\n' + seenFacts.map((f, i) => (i+1) + '. "' + f + '"').join('\n')
+    : '';
+
+  const errorHistory = allErrors.map((e, i) => (i+1) + '. ' + e).join('\n');
   const retryHint = allErrors.length > 0 && corrections.length === 0
-    ? `\n\nIMPORTANT: your previous ${allErrors.length} attempt(s) failed. Full rejection history:\n${allErrors.map((e, i) => `Attempt ${i+1}: ${e}`).join('\n')}\n\nYou must produce something genuinely different from all previous attempts. Rules:\n- If any error mentions an em dash, rewrite entirely without that character.\n- If an error says "too long", your next description must be noticeably shorter. If it says "too short", make it longer.\n- If a specific claim was already rejected, do not try any version of it again. That entire angle is closed.\n- If the same category of fact has failed more than once, move to a completely different category.\n- Choose a fact from a different aspect of the place entirely: if geography failed, try architecture; if construction failed, try cultural history; if a food story failed, try the building's age or neighbourhood.`
+    ? '\n\nIMPORTANT: your previous ' + allErrors.length + ' attempt(s) failed. Full rejection history:\n' + errorHistory + '\n\nYou must produce something genuinely different from all previous attempts. Rules:\n- If any error mentions an em dash, rewrite entirely without that character.\n- If an error says "too long", your next description must be noticeably shorter. If it says "too short", make it longer.\n- If a specific claim was already rejected, do not try any version of it again. That entire angle is closed.\n- If the same category of fact has failed more than once, move to a completely different category.\n- Choose a fact from a different aspect of the place entirely: if geography failed, try architecture; if construction failed, try cultural history; if a food story failed, try the building\'s age or neighbourhood.'
     : '';
 
   const raw = await callClaude(`You are a writer creating stamp descriptions for a passport collectible app. Each description is a single, self-contained factual sentence about a real place.
@@ -658,7 +674,7 @@ PLACE TYPE GUIDANCE:
 - MUSEUM or INSTITUTION: collection size, founding story, or a well-documented record
 - PARK or NATURE: scale, age, geological or ecological fact. Use documented figures like acreage, not process quantities like cartloads.
 - ISLAND or ARCHIPELAGO: geological origin, coral reef facts, or well-documented geographic record. Avoid date line and meridian claims as these are frequently imprecise.
-- NEIGHBOURHOOD or DISTRICT: origin story, transformation, physical character. For DUMBO specifically, avoid the acronym coinage date as this is disputed across sources. The ballast stone cobblestone streets are a well-documented and verified angle.${retryHint}${correctionSeed}
+- NEIGHBOURHOOD or DISTRICT: origin story, transformation, physical character. For DUMBO specifically, avoid the acronym coinage date as this is disputed across sources. The ballast stone cobblestone streets are a well-documented and verified angle.${seenHint}${retryHint}${correctionSeed}
 
 Respond ONLY with valid JSON, no markdown:
 {"fact":"the description here","country":"Full country name, e.g. United States of America"}`);
@@ -767,14 +783,14 @@ Respond ONLY with valid JSON, no markdown:
 }
 
 // ── Step 3: Full pipeline — generate + verify, with retries ──────────────────
-async function generateAndVerify(place, onStatusUpdate) {
+async function generateAndVerify(place, onStatusUpdate, seenFacts = []) {
   let lastError = '';
   const allErrors = [];
-  const corrections = []; // extracted corrected versions from verifier — used as direct seeds
+  const corrections = [];
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       onStatusUpdate(`Generating stamp description (attempt ${attempt}/${MAX_RETRIES})${attempt > 1 ? ', retrying with different approach...' : ''}`, attempt);
-      const { fact, country } = await generateCandidateFact(place, lastError, allErrors, corrections);
+      const { fact, country } = await generateCandidateFact(place, lastError, allErrors, corrections, seenFacts);
 
       onStatusUpdate(`Verifying factual claim…`, attempt);
       const verifyData = await autoVerifyFact(place, fact);
@@ -783,7 +799,6 @@ async function generateAndVerify(place, onStatusUpdate) {
     } catch(e) {
       lastError = e.message;
       allErrors.push(e.message);
-      // Extract any corrected version or suggested fix from the error message
       const corrMatch = e.message.match(/(?:Corrected version|Suggested fix): "([^"]+)"/);
       if (corrMatch) corrections.push(corrMatch[1]);
       if (attempt < MAX_RETRIES) await sleep(800);
@@ -916,14 +931,12 @@ function handleCardClick(e) {
 // ── Single generate ───────────────────────────────────────────────────────────
 // ── Per-item generation (used by batch run and retry buttons) ─────────────────
 async function generateItemAt(i, place, group) {
-  // Show loading state inside the group
   const loadingEl = document.createElement('div');
   loadingEl.className = 'loading';
   loadingEl.id = `group-loading-${i}`;
   loadingEl.style.cssText = 'padding:1rem 0;font-size:13px';
   loadingEl.innerHTML = `Generating &amp; verifying description${dots()}<div class="loading-step"></div>`;
 
-  // Replace whatever is currently in the result slot
   const existing = group.querySelector('.fact-card, .item-error');
   if (existing) existing.replaceWith(loadingEl);
   else group.appendChild(loadingEl);
@@ -932,7 +945,7 @@ async function generateItemAt(i, place, group) {
     const result = await generateAndVerify(place, (msg, attempt) => {
       const el = document.getElementById(`group-loading-${i}`);
       if (el) el.innerHTML = `${esc(msg)}${dots()}<div class="loading-step">${attempt>1?'Attempt '+attempt+' of '+MAX_RETRIES:''}</div>`;
-    });
+    }, getSeenFacts(place));
 
     batchResults[i].fact = result.fact;
     batchResults[i].country = result.country;
@@ -941,9 +954,10 @@ async function generateItemAt(i, place, group) {
 
     const factDiv = document.createElement('div');
     renderFactCard(factDiv, place, result, `b${i}`);
-    const loading = document.getElementById(`group-loading-${i}`);
-    if (loading) loading.replaceWith(factDiv.firstChild);
+    const loadingDone = document.getElementById(`group-loading-${i}`);
+    if (loadingDone) loadingDone.replaceWith(factDiv.firstChild);
     dbAddEntry(place, result.fact, result.sources, CURRENT_SESSION_ID, result.country);
+    recordSeenFact(place, result.fact);
     updateBadge();
 
   } catch(e) {
@@ -957,8 +971,8 @@ async function generateItemAt(i, place, group) {
         <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M13.5 2.5A6.5 6.5 0 1 1 7 1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><polyline points="10 1 7 1 7 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Try again
       </button>`;
-    const loading = document.getElementById(`group-loading-${i}`);
-    if (loading) loading.replaceWith(errDiv);
+    const loadingErr = document.getElementById(`group-loading-${i}`);
+    if (loadingErr) loadingErr.replaceWith(errDiv);
     else group.appendChild(errDiv);
   }
 }
@@ -995,10 +1009,11 @@ async function generateSingle() {
       const step = document.getElementById('status-step');
       if (el) el.innerHTML = `${esc(msg)}${dots()}`;
       if (step) step.textContent = attempt > 1 ? `Attempt ${attempt} of ${MAX_RETRIES}` : '';
-    });
+    }, getSeenFacts(q));
 
     renderFactCard(results, q, result, 's');
     dbAddEntry(q, result.fact, result.sources, CURRENT_SESSION_ID, result.country);
+    recordSeenFact(q, result.fact);
 
   } catch(e) {
     results.innerHTML = `<div class="error-msg">
