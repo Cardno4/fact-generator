@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Fact Generator v39</title>
+  <title>Fact Generator v40</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -292,7 +292,7 @@
 <div class="container" id="app-screen">
   <div class="topbar">
     <div class="topbar-left">
-      <h1>Fact Generator <span style="font-size:13px;font-weight:400;color:#bbb;letter-spacing:0.02em">v39</span></h1>
+      <h1>Fact Generator <span style="font-size:13px;font-weight:400;color:#bbb;letter-spacing:0.02em">v40</span></h1>
       <p>One verified stamp description per place — shown with stamp framing line, factual claim confirmed before display</p>
     </div>
     <div class="topbar-right">
@@ -711,41 +711,8 @@ async function generateCandidateFact(place, wikiFactList, lastError = '', allErr
     : '';
 
   const errorHistory = allErrors.map((e, i) => (i+1) + '. ' + e).join('\n');
-
-  // Detect which fact categories have already been rejected this round
-  // so we can force the generator to switch to a completely different angle
-  const rejectedCategoryKeywords = {
-    'border': 'borders/neighbouring countries',
-    'neighbour': 'borders/neighbouring countries',
-    'shares land': 'borders/neighbouring countries',
-    'island': 'island counts',
-    'coastline': 'coastline length',
-    'skyscraper': 'skyscrapers/buildings',
-    'seikan': 'specific sub-location (needs its own Wikipedia article)',
-    'tunnel': 'specific sub-location (needs its own Wikipedia article)',
-    'bridge': 'specific sub-location (needs its own Wikipedia article)',
-    'lake': 'lakes',
-    'mountain': 'mountains/elevation',
-    'population': 'population statistics',
-    'largest': 'size/area records',
-    'smallest': 'size/area records',
-    'oldest': 'age records',
-    'colony': 'colonial history',
-  };
-  const rejectedCategories = [];
-  allErrors.forEach(e => {
-    Object.entries(rejectedCategoryKeywords).forEach(([kw, cat]) => {
-      if (e.toLowerCase().includes(kw) && !rejectedCategories.includes(cat)) {
-        rejectedCategories.push(cat);
-      }
-    });
-  });
-  const rejectedBlock = rejectedCategories.length > 0
-    ? '\n\nCATEGORIES THAT HAVE ALREADY FAILED — do not attempt these again, pick a completely different angle:\n' + rejectedCategories.map(c => '- ' + c).join('\n')
-    : '';
-
   const retryHint = allErrors.length > 0 && corrections.length === 0
-    ? '\n\nIMPORTANT: your previous ' + allErrors.length + ' attempt(s) failed:\n' + errorHistory + rejectedBlock + '\n\nYou MUST choose a completely different fact category. Do not rephrase a rejected claim.'
+    ? '\n\nIMPORTANT: your previous ' + allErrors.length + ' attempt(s) failed:\n' + errorHistory + '\n\nProduce something genuinely different. If a specific claim was rejected, do not try it again.'
     : '';
 
   // Fix 1: Category diversity — tell Claude which categories are already saturated
@@ -760,28 +727,14 @@ async function generateCandidateFact(place, wikiFactList, lastError = '', allErr
   const countryGuidance = `\n\nCOUNTRY-LEVEL FACT RULE: The fact must be intrinsic to ${place} itself — not something that is equally true of neighbouring countries, shared rivers, or linguistic communities that exist elsewhere. Ask: "Could this fact be written about a different country?" If yes, choose a different fact.`;
 
   // Fix 5: Article capitalisation for place names with "the"
-  // Places that take "the" as an article
   const theCountries = ['united arab emirates', 'czech republic', 'philippines', 'united states', 'united kingdom', 'netherlands', 'bahamas', 'maldives', 'seychelles', 'comoros', 'solomon islands', 'marshall islands', 'cayman islands', 'faroe islands', 'turks and caicos'];
-  // Institutions/venues that take "the" (museums, galleries, libraries, etc.)
-  const theInstitutions = ['museum', 'gallery', 'galleries', 'library', 'libraries', 'theatre', 'theater', 'palace', 'cathedral', 'basilica', 'colosseum', 'parthenon', 'pantheon', 'louvre', 'hermitage', 'smithsonian', 'metropolitan', 'british museum', 'national museum', 'natural history', 'science museum', 'art institute', 'guggenheim', 'tate ', 'uffizi', 'prado', 'rijksmuseum', 'acropolis', 'forum', 'colossus', 'forbidden city', 'great wall', 'eiffel tower', 'taj mahal', 'opera house'];
-  const placeLow = place.toLowerCase();
-  const placeNeedsThe = theCountries.some(c => placeLow.includes(c)) || theInstitutions.some(i => placeLow.includes(i));
+  const placeNeedsThe = theCountries.some(c => place.toLowerCase().includes(c));
   const stampIntroPlace = placeNeedsThe ? 'the ' + place : place;
 
   // Build the confirmed facts block — Claude can ONLY use these
-  // Filter out facts from rejected categories so retries don't keep hitting the same wall
-  const filteredWikiFactList = wikiFactList && rejectedCategories.length > 0
-    ? wikiFactList.filter(f => {
-        const claimLow = (f.claim + ' ' + f.source_quote).toLowerCase();
-        return !Object.keys(rejectedCategoryKeywords).some(kw => claimLow.includes(kw) &&
-          rejectedCategories.includes(rejectedCategoryKeywords[kw]));
-      })
-    : wikiFactList;
-  const factsToUse = (filteredWikiFactList && filteredWikiFactList.length > 0) ? filteredWikiFactList : wikiFactList;
-
-  const factsBlock = factsToUse && factsToUse.length > 0
+  const factsBlock = wikiFactList && wikiFactList.length > 0
     ? '\n\nWIKIPEDIA-CONFIRMED FACTS — you MUST base your description on one of these. Do not use any dates, years, records, or statistics not in this list:\n' +
-      factsToUse.map((f, i) => `  ${i+1}. [${f.type}] ${f.claim} — source: "${f.source_quote}"`).join('\n')
+      wikiFactList.map((f, i) => `  ${i+1}. [${f.type}] ${f.claim} — source: "${f.source_quote}"`).join('\n')
     : '\n\nNo Wikipedia article was available. Use only facts you are highly confident (9/10+) are accurate. If uncertain, describe the place without specific numbers.';
 
   const raw = await callClaude(`You are a writer creating stamp descriptions for a passport collectible app. Each description is a single, self-contained factual sentence about a real place.
@@ -810,27 +763,14 @@ BAD EXAMPLES — do not produce facts like these:
 - Facts about immigration or population demographics
 - Island counts, coastline lengths, or border counts if these categories are already overused in this batch
 
-LANGUAGE THAT IS STRICTLY FORBIDDEN — do not use any of these phrases under any circumstances:
-- "more than any other country / city / region / nation"
-- "one of the largest / smallest / oldest / most / fewest / highest / lowest"
-- "among the world's most / least"
-- Any ordinal ranking: "fourth-largest", "second-most", "third-highest" etc.
-- "the only country / city / place that..."  — unless you are 100% certain and it is in the Wikipedia-confirmed facts list
-- "world record" — unless explicitly in the Wikipedia-confirmed facts list
-- "world's first" — ALLOWED only if it appears verbatim in the Wikipedia-confirmed facts list above. If it is not in the list, do not use it.
-If you find yourself wanting to use comparative superlative phrases not in the confirmed facts list, choose a different fact entirely.
-
 BANNED FACT CATEGORIES — these will be automatically rejected:
-- Current politics, elections, voting systems or political parties
-- Current laws, legislation, legal rulings or criminal justice policy
+- Politics, elections, voting systems or political parties
+- Laws, legislation, legal rulings or criminal justice policy
 - Drug policy, healthcare policy or social welfare programmes
 - Military spending, defence policy or treaties
 - Economic policy, tax systems or trade agreements
 - Immigration, citizenship, expat populations or demographic breakdown by nationality
 - Death, human remains, burials, cemeteries, executions, disasters or tragedies
-- Current governance structures: how a country is currently governed, its federal system, parliamentary arrangements, or constitutional setup
-
-NOTE: Named historical events involving political change ARE allowed — revolutions, conquests, declarations of independence, unifications — provided they have a specific year and are in the Wikipedia-confirmed facts list. The test is: does this describe a specific moment in history (allowed) or how the place is governed today (banned)?
 
 PREFERRED FACT CATEGORIES (in order of preference — use earlier categories before later ones):
 1. Architecture and engineering: construction records, founding stories, structural facts unique to this place
@@ -878,7 +818,7 @@ async function autoVerifyFact(place, fact, wikiData) {
     iconBg: ICON_BG[j] || '#f0f0f0', iconColor: ICON_COLOR[j] || '#555', iconLetter: ICON_LETTER[j] || '?'
   }));
 
-  const verifyRaw = await callClaude(`You are a fact-checker. Assess this specific verifiable claim:\n\nClaim: "${parsed.key_claim}"\nFull description: "${fact}"\nContext (place): "${place}"${wikiContext}\n\nClassify into one of three categories:\n1. CORRECT: factually accurate and well-documented\n2. AMBIGUOUS: core event is real but a minor detail (e.g. year varying by 1-2 across sources) is uncertain\n3. WRONG: clear factual error, unverifiable specific number, soft record claim, OR touches any banned category\n\nSOFT RECORD CHECK — apply this mechanically before anything else:\nScan the description for these exact phrases or patterns:\n- "more than any other" → WRONG unless the Wikipedia extract contains this verbatim\n- "one of the largest / smallest / oldest / most / fewest / highest / lowest" → WRONG unless the Wikipedia extract contains this verbatim\n- "among the world's" → WRONG unless the Wikipedia extract contains this verbatim\n- Any ordinal ranking: "fourth-largest", "second-most", "third-highest" → WRONG unless Wikipedia extract states it verbatim\n- "world record" → WRONG unless Wikipedia extract names it explicitly\nDo not use your own knowledge to validate these claims. If the phrase is in the description but NOT verbatim in the Wikipedia extract, it is WRONG. No exceptions.\n\nBANNED CATEGORY CHECK — classify as WRONG if the description touches any of these, regardless of factual accuracy:\n- Immigration, expat populations, demographic breakdown by nationality or origin\n- Death, human remains, burials, cemeteries, executions, disasters or tragedies\n- Politics, elections, current laws, current military policy, current economic policy\n- Current constitutional structure, current governance systems, current parliamentary arrangements, federal/state autonomy as it exists today\n- Facts about current education policy, policing, legal systems or public administration\n- Facts that are not intrinsic to the named place (e.g. a river that flows through 11 countries is not a fact about one country)\n\nCRITICAL DISTINCTION — do NOT ban these, they are historical events not governance facts:\n- Named historical revolutions, conquests, declarations or unifications with a specific year (e.g. French Revolution 1789, Fall of Constantinople 1453, Declaration of Independence 1776)\n- These are category C historical events and are explicitly allowed\n- Only ban facts that describe HOW a country is currently governed, not facts about a specific historical moment that changed it\n\nIf WRONG, provide a corrected version or suggest a different angle.\n\nRespond ONLY with valid JSON, no markdown:\n{"status": "CORRECT|AMBIGUOUS|WRONG", "note": "brief explanation", "correction": "corrected claim or empty string"}`, 400);
+  const verifyRaw = await callClaude(`You are a fact-checker. Assess this specific verifiable claim:\n\nClaim: "${parsed.key_claim}"\nFull description: "${fact}"\nContext (place): "${place}"${wikiContext}\n\nClassify into one of three categories:\n1. CORRECT: factually accurate and well-documented\n2. AMBIGUOUS: core event is real but a minor detail (e.g. year varying by 1-2 across sources) is uncertain\n3. WRONG: clear factual error, unverifiable specific number, OR touches any banned category\n\nBANNED CATEGORY CHECK — classify as WRONG if the description touches any of these, regardless of factual accuracy:\n- Immigration, expat populations, demographic breakdown by nationality or origin\n- Death, human remains, burials, cemeteries, executions, disasters or tragedies\n- Politics, elections, laws, military policy, economic policy\n- Facts that are not intrinsic to the named place (e.g. a river that flows through 11 countries is not a fact about one country)\n\nIf WRONG, provide a corrected version or suggest a different angle.\n\nRespond ONLY with valid JSON, no markdown:\n{"status": "CORRECT|AMBIGUOUS|WRONG", "note": "brief explanation", "correction": "corrected claim or empty string"}`, 400);
 
   const verifyResult = JSON.parse(verifyRaw);
   if (verifyResult.status === 'WRONG') {
@@ -972,7 +912,7 @@ function renderFactCard(container, place, result, prefix) {
       </span>
       <span class="fact-type-label">Stamp description</span>
     </div>
-    <div class="fact-stamp-intro">${esc(result.stampIntro || 'You got this stamp by visiting ' + place.split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ') + '.')}</div>
+    <div class="fact-stamp-intro">${esc(result.stampIntro || 'You got this stamp by visiting ' + place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ') + '.')}</div>
     <div class="fact-text">${esc(result.fact)}</div>
     <div class="fact-foot">
       <span class="char-count">${result.fact.length} chars</span>
@@ -1017,7 +957,7 @@ function handleCardClick(e) {
 
   if (action === 'copy-fact' && stored) {
     const fullText = stored.place
-      ? `${stored.stampIntro || ('You got this stamp by visiting ' + stored.place.split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ') + '.')}\n\n${stored.fact}`
+      ? `${stored.stampIntro || ('You got this stamp by visiting ' + stored.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ') + '.')}\n\n${stored.fact}`
       : stored.fact;
     copyToClipboard(fullText, btn);
   }
@@ -1395,9 +1335,9 @@ function exportBatchXLSX() {
     // Build rows as plain arrays — no style objects here to avoid SheetJS cellStyles bug
     const dataRows = results.map((r, i) => {
       const extras = seenHeaders.map(h => extraColsByResult[i][h] || '');
-      const stampLine = r.stampIntro || `You got this stamp by visiting ${r.place.split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ')}.`;
+      const capPlace = r.place.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
       if (r.fact) {
-        const fullDesc = `${stampLine}${CRLF}${CRLF}${r.fact}`;
+        const fullDesc = `You got this stamp by visiting ${capPlace}.${CRLF}${CRLF}${r.fact}`;
         const srcs = (r.sources || []).map(s => s.label + ': ' + s.url);
         return [r.place, r.country || '', ...extras, fullDesc, r.fact.length, 'Verified', '', srcs[0] || '', srcs[1] || '', srcs[2] || ''];
       } else {
@@ -1548,7 +1488,7 @@ function renderHistory() {
           <div class="db-chevron">▾</div>
         </div>
         <div class="db-item-body">
-          <div class="stamp-intro" style="font-size:11px;color:#aaa;margin-bottom:4px;">${esc(r.stampIntro || 'You got this stamp by visiting ' + r.place.split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ') + '.')}</div>
+          <div class="stamp-intro" style="font-size:11px;color:#aaa;margin-bottom:4px;">${esc(r.stampIntro || 'You got this stamp by visiting ' + r.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ') + '.')}</div>
           <div class="db-fact-text">${esc(r.fact||'')}</div>
           <div class="db-actions">
             ${verifyBtnHtml}
@@ -1583,10 +1523,10 @@ function exportBatchCSV() {
   const rows = [headerRow];
   batchResults.forEach((r, i) => {
     const extras = seenHeaders.map(h => extraColsByResult[i][h] || '');
-    const capPlaceFallback = (r.place||'').split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ');
+    const capPlace = (r.place||'').split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
     if (r.fact) {
       const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
-      rows.push([r.place, r.country||'', r.sheet||'', ...extras, r.stampIntro||`You got this stamp by visiting ${capPlaceFallback}.`, r.fact, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
+      rows.push([r.place, r.country||'', r.sheet||'', ...extras, r.stampIntro||`You got this stamp by visiting ${capPlace}.`, r.fact, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
     } else {
       rows.push([r.place, r.country||'', r.sheet||'', ...extras, '', '', 0, 'Failed', r.error||'Could not produce a verified description after 4 attempts', '', '', '']);
     }
@@ -1618,10 +1558,10 @@ function exportBatchGSheets() {
   const rows = [headerRow];
   batchResults.forEach((r, i) => {
     const extras = seenHeaders.map(h => extraColsByResult[i][h] || '');
-    const capPlaceFallback = (r.place||'').split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ');
+    const capPlace = (r.place||'').split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
     if (r.fact) {
       const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
-      rows.push([r.place, r.country||'', r.sheet||'', ...extras, r.stampIntro||`You got this stamp by visiting ${capPlaceFallback}.`, r.fact, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
+      rows.push([r.place, r.country||'', r.sheet||'', ...extras, r.stampIntro||`You got this stamp by visiting ${capPlace}.`, r.fact, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
     } else {
       rows.push([r.place, r.country||'', r.sheet||'', ...extras, '', '', 0, 'Failed', r.error||'Could not produce a verified description after 4 attempts', '', '', '']);
     }
@@ -1656,8 +1596,8 @@ function exportSessionCSV(sessionId, sessionDate) {
   const rows = [['Place', 'Country', 'Stamp Description', 'Char Count', 'Status', 'Source 1', 'Source 2', 'Source 3']];
   records.forEach(r => {
     const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
-    const capPlace = r.place.split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ');
-    const fullDesc = r.fact ? `${r.stampIntro || 'You got this stamp by visiting ' + r.place.split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ') + '.'}\n\n${r.fact}` : '';
+    const capPlace = r.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
+    const fullDesc = r.fact ? `You got this stamp by visiting ${capPlace}.\n\n${r.fact}` : '';
     rows.push([r.place, r.country||'', fullDesc, (r.fact||'').length, r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
   });
   // Label filename with session datetime
@@ -1671,8 +1611,8 @@ function exportHistoryCSV() {
   const rows = [['Place', 'Country', 'Stamp Description', 'Char Count', 'Session', 'Date', 'Status', 'Source 1', 'Source 2', 'Source 3']];
   records.forEach(r => {
     const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
-    const capPlace = r.place.split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ');
-    const fullDesc = r.fact ? `${r.stampIntro || 'You got this stamp by visiting ' + r.place.split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ') + '.'}\n\n${r.fact}` : '';
+    const capPlace = r.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
+    const fullDesc = r.fact ? `You got this stamp by visiting ${capPlace}.\n\n${r.fact}` : '';
     const sessionLabel = r.sessionId ? fmtDate(new Date(parseInt(r.sessionId.replace('session_',''))).toISOString()) : 'Legacy';
     rows.push([r.place, r.country||'', fullDesc, (r.fact||'').length, sessionLabel, fmtDate(r.date), r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
   });
@@ -1695,8 +1635,8 @@ function exportHistoryXLSX() {
     const rows = [headers];
     group.records.forEach(r => {
       const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
-      const capPlace = r.place.split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ');
-      rows.push([r.place, r.country||'', r.fact ? (r.stampIntro || `You got this stamp by visiting ${r.place.split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ')}.`) : '', r.fact||'', (r.fact||'').length, fmtDate(r.date), r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
+      const capPlace = r.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
+      rows.push([r.place, r.country||'', r.fact ? `You got this stamp by visiting ${capPlace}.` : '', r.fact||'', (r.fact||'').length, fmtDate(r.date), r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
     });
     const ws = XLSX.utils.aoa_to_sheet(rows);
     ws['!cols'] = [{wch:28},{wch:22},{wch:38},{wch:70},{wch:8},{wch:18},{wch:10},{wch:45},{wch:45},{wch:45}];
