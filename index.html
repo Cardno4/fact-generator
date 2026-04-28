@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Fact Generator v28</title>
+  <title>Fact Generator</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -151,7 +151,6 @@
       background: #e8f4e8; color: #1a6b3a; border-radius: 999px; padding: 3px 10px;
       display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
     }
-    .fact-stamp-intro { font-size: 13px; color: #888; font-style: italic; margin-bottom: 8px; }
     .fact-type-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #aaa; }
     .fact-text { font-size: 15px; line-height: 1.65; color: #1a1a1a; margin-bottom: 12px; }
     .fact-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -190,9 +189,6 @@
 
     /* Place group (batch) */
     .place-group { margin-bottom: 2rem; }
-    .retry-btn { font-size: 12px; padding: 5px 14px; border: 1px solid #ddd; border-radius: 8px; background: #fff; cursor: pointer; color: #555; margin-top: 10px; display: inline-flex; align-items: center; gap: 6px; }
-    .retry-btn:hover { background: #f5f5f5; border-color: #aaa; }
-    .retry-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .place-heading { font-size: 13px; font-weight: 600; color: #555; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
     .place-num { width: 22px; height: 22px; border-radius: 50%; background: #1a1a1a; color: #fff; font-size: 11px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
@@ -292,8 +288,8 @@
 <div class="container" id="app-screen">
   <div class="topbar">
     <div class="topbar-left">
-      <h1>Fact Generator <span style="font-size:13px;font-weight:400;color:#bbb;letter-spacing:0.02em">v28</span></h1>
-      <p>One verified stamp description per place — shown with stamp framing line, factual claim confirmed before display</p>
+      <h1>Fact Generator</h1>
+      <p>One verified historical fact (150–250 chars) per place — cross-checked against live Wikipedia articles before display</p>
     </div>
     <div class="topbar-right">
       <span class="key-pill" id="key-pill"></span>
@@ -342,7 +338,7 @@
         <span class="tag" data-fill="The Colosseum">The Colosseum</span>
         <span class="tag" data-fill="Santorini">Santorini</span>
       </div>
-      <div id="results-single"><div class="empty">Your verified stamp description will appear here</div></div>
+      <div id="results-single"><div class="empty">Your verified historical fact will appear here</div></div>
     </div>
 
     <!-- Batch -->
@@ -356,7 +352,7 @@
         </div>
         <div class="upload-title">Drop your file here, or click to browse</div>
         <div class="upload-sub">CSV, Excel (.xlsx / .xls), or plain text (.txt)</div>
-        <div class="upload-hint">One place per row. For multi-tab files, upload as <strong>.xlsx</strong> — CSV only supports a single sheet. Excel files let you choose which tabs and columns to include.</div>
+        <div class="upload-hint">One place per row. For Excel files with multiple sheets, choose which sheets and columns to include.</div>
       </div>
       <div class="file-preview" id="file-preview">
         <div class="file-icon" id="file-icon">CSV</div>
@@ -371,7 +367,7 @@
         <div class="sheet-list" id="sheet-list"></div>
         <div class="sheet-total" id="sheet-total"></div>
       </div>
-      <button class="batch-run-btn" id="btn-batch">Generate stamp descriptions for all places</button>
+      <button class="batch-run-btn" id="btn-batch">Generate verified facts for all places</button>
       <div class="progress-wrap" id="progress-wrap">
         <div class="progress-top">
           <span class="progress-label" id="progress-label">Processing…</span>
@@ -381,10 +377,10 @@
       </div>
       <div id="results-batch"></div>
       <div class="export-bar" id="export-bar">
-        <span class="export-text" id="export-bar-text">All done — export facts as Excel</span>
+        <span class="export-text">All done — export facts as CSV</span>
         <button class="export-btn" id="export-batch-btn">
           <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2v9M4 8l4 4 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 13h12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-          Export as Excel (.xlsx)
+          Export as CSV
         </button>
       </div>
     </div>
@@ -409,7 +405,7 @@
 // ── Constants ────────────────────────────────────────────────────────────────
 const DB_KEY = 'factgen_history';
 const STORED_KEY = 'factgen_apikey';
-const MAX_RETRIES = 4;
+const MAX_RETRIES = 3;
 const ICON_BG    = ['#e8f0fe', '#e8f4e8', '#fef3e2'];
 const ICON_COLOR = ['#1557c0', '#1a6b3a', '#b06000'];
 const ICON_LETTER = ['W', 'O', 'N'];
@@ -417,23 +413,12 @@ const ICON_LETTER = ['W', 'O', 'N'];
 // ── Fact store (prefix → {fact, sources}) ────────────────────────────────────
 const FACT_STORE = {};
 let factStoreCounter = 0;
-function storeFact(fact, sources, place) {
+function storeFact(fact, sources) {
   const id = ++factStoreCounter;
-  FACT_STORE[id] = { fact, sources, place };
+  FACT_STORE[id] = { fact, sources };
   return id;
 }
 function getStored(id) { return FACT_STORE[id] || null; }
-
-// ── Seen facts per place — prevents refresh returning the same description ────
-const SEEN_FACTS = {}; // place (lowercase) → [fact string, ...]
-function recordSeenFact(place, fact) {
-  const key = place.toLowerCase();
-  if (!SEEN_FACTS[key]) SEEN_FACTS[key] = [];
-  if (!SEEN_FACTS[key].includes(fact)) SEEN_FACTS[key].push(fact);
-}
-function getSeenFacts(place) {
-  return SEEN_FACTS[place.toLowerCase()] || [];
-}
 
 // ── State ────────────────────────────────────────────────────────────────────
 let SESSION_KEY = '';
@@ -457,7 +442,7 @@ document.addEventListener('DOMContentLoaded', () => {
     t.addEventListener('click', () => { document.getElementById('q').value = t.dataset.fill; });
   });
   document.getElementById('btn-batch').addEventListener('click', generateBatch);
-  document.getElementById('export-batch-btn').addEventListener('click', exportBatchXLSX);
+  document.getElementById('export-batch-btn').addEventListener('click', exportBatchCSV);
   document.getElementById('file-clear').addEventListener('click', clearFile);
   document.getElementById('db-search').addEventListener('input', renderHistory);
   document.getElementById('db-export-btn').addEventListener('click', exportHistoryCSV);
@@ -550,10 +535,10 @@ function signOut() {
 // ── DB ────────────────────────────────────────────────────────────────────────
 function dbLoad() { try { return JSON.parse(localStorage.getItem(DB_KEY)||'[]'); } catch(e) { return []; } }
 function dbSave(r) { localStorage.setItem(DB_KEY, JSON.stringify(r)); updateBadge(); }
-function dbAddEntry(place, fact, sources, sessionId, country) {
+function dbAddEntry(place, fact, sources, sessionId) {
   const records = dbLoad();
   const existing = records.findIndex(r => r.place.toLowerCase() === place.toLowerCase() && r.sessionId === sessionId);
-  const entry = { id: existing>=0 ? records[existing].id : Date.now()+Math.random(), place, fact, sources, country: country||'', sessionId: sessionId||'', date: new Date().toISOString() };
+  const entry = { id: existing>=0 ? records[existing].id : Date.now()+Math.random(), place, fact, sources, sessionId: sessionId||'', date: new Date().toISOString() };
   if (existing>=0) records[existing] = entry; else records.unshift(entry);
   dbSave(records);
 }
@@ -603,239 +588,223 @@ async function callClaude(prompt, maxTokens=800) {
   return (data.content||[]).map(b=>b.text||'').join('').replace(/```json|```/g,'').trim();
 }
 
-// ── Step 1: Generate candidate description ───────────────────────────────────
-async function generateCandidateFact(place, lastError = '', allErrors = [], corrections = [], seenFacts = []) {
-  // If the verifier provided a corrected factual seed, use it directly as the mandatory basis
-  const correctionSeed = corrections.length > 0
-    ? `\n\nVERIFIED FACTUAL SEED: A previous attempt failed but the fact-checker confirmed this exact factual content is accurate:\n"${corrections[corrections.length - 1]}"\n\nThis seed IS your factual basis. Do not contradict it or add unverifiable claims. If the seed is shorter than 150 characters, expand it with one additional well-documented detail about the same aspect of this place to reach the target length. The total description must be between 160 and 220 characters.`
-    : '';
+// ── Step 1: Generate candidate fact ──────────────────────────────────────────
+async function generateCandidateFact(place) {
+  const raw = await callClaude(`You are a historical fact writer. Write exactly 1 specific historical fact about: "${place}"
 
-  const seenHint = seenFacts.length > 0
-    ? '\n\nDO NOT REPEAT: The following descriptions have already been shown to the user for this place and must not be repeated or closely paraphrased. Choose a completely different angle, subject, or aspect of the place:\n' + seenFacts.map((f, i) => (i+1) + '. "' + f + '"').join('\n')
-    : '';
+Rules (strict):
+- The fact must be between 150 and 250 characters long — count carefully
+- It must be a single complete sentence
+- Do NOT start the sentence with "${place}" — vary the opening
 
-  const errorHistory = allErrors.map((e, i) => (i+1) + '. ' + e).join('\n');
-  const retryHint = allErrors.length > 0 && corrections.length === 0
-    ? '\n\nIMPORTANT: your previous ' + allErrors.length + ' attempt(s) failed. Full rejection history:\n' + errorHistory + '\n\nYou must produce something genuinely different from all previous attempts. Rules:\n- If any error mentions an em dash, rewrite entirely without that character.\n- If an error says "too long", your next description must be noticeably shorter. If it says "too short", make it longer.\n- If a specific claim was already rejected, do not try any version of it again. That entire angle is closed.\n- If the same category of fact has failed more than once, move to a completely different category.\n- Choose a fact from a different aspect of the place entirely: if geography failed, try architecture; if construction failed, try cultural history; if a food story failed, try the building\'s age or neighbourhood.'
-    : '';
+CLAIM TYPE — you MUST use exactly one of these categories (they are the most reliably verifiable):
+  A) Founding or construction year  — e.g. "Built in 1173, …"
+  B) UNESCO World Heritage designation year — e.g. "Designated a UNESCO World Heritage Site in 1987, …"
+  C) A single named historical event with a confirmed year — e.g. "In 1453, … fell after …"
+  D) Age derived from a confirmed founding year — e.g. "Standing for over 800 years since its founding in 1209, …"
 
-  const raw = await callClaude(`You are a writer creating stamp descriptions for a passport collectible app. Each description is a single, self-contained factual sentence about a real place.
-
-FORMAT: One sentence. Factual. Specific. Surprising. No closing sentiment, no evocative flourish, no "and you can feel it today" type endings. The sentence ends when the fact ends.
-
-The stamp card already tells the user they visited this place. Your job is only to give them one genuinely interesting true thing about it.
-
-EM DASH RULE: The character (—) is strictly forbidden. Do not use it anywhere.
-
-TARGET LENGTH: 160 to 220 characters. Hard minimum: 150. Hard maximum: 240. The sentence should be as long as it needs to be to state the fact clearly and specifically, and no longer.
-
-Place: "${place}"
-
-GOOD EXAMPLES (factual, specific, no closing sentiment):
-- "The Empire State Building was constructed in just 410 days, with crews working in shifts around the clock and finishing 45 days ahead of schedule during the height of the Great Depression." (188 chars)
-- "The Eiffel Tower was nearly demolished in 1909 when its original 20-year lease expired, and was saved only because its antenna had become essential for military radio communications." (181 chars)
-- "Machu Picchu sits at 2,430 metres above sea level and was never discovered by Spanish conquistadors, remaining unknown to the outside world until Hiram Bingham documented it in 1911." (182 chars)
-- "DUMBO's cobblestone streets were laid with ballast stones carried by 18th-century European cargo ships and dumped in Brooklyn harbour after Atlantic crossings." (158 chars)
-- "Wales has more castles per square mile than any other country in Europe, with over 600 medieval fortifications built by Welsh princes and Norman lords across its valleys and coastline." (183 chars)
-
-BAD EXAMPLES (do not produce these):
-- "...and you can still feel the history underfoot today." (invented sentiment)
-- "...where the past and present meet." (generic filler)
-- "...a place that has never forgotten its origins." (vague)
-- "...making it one of the most visited places on earth." (cliché)
-
-BANNED FACT CATEGORIES:
-- Politics, elections, voting systems or political parties
-- Laws, legislation, legal rulings or criminal justice policy
-- Drug policy, healthcare policy or social welfare programmes
-- Military spending, defence policy or treaties
-- Economic policy, tax systems or trade agreements
-- Immigration or citizenship rules
-- Death, human remains, burials, cemeteries, executions, disasters or tragedies
-
-PREFERRED FACT CATEGORIES:
-- Geography: size, position, borders, terrain, coastline, elevation, rivers, islands
-- Natural world: climate records, wildlife, geology, ecosystems, natural phenomena
-- Architecture and engineering: construction records, materials, scale, structural facts
-- History of exploration, trade or empire: routes, discoveries, expeditions
-- Cultural output: language reach, UNESCO sites, ancient civilisations, historic firsts
-- Physical records: oldest, largest, deepest, highest, longest, specific and measurable
-
-RULES FOR NUMBERS AND QUANTITIES:
-- Only use a specific number if it is well-documented in multiple encyclopaedia-level sources
-- If uncertain, describe the fact without the number rather than inventing one
-- Maximum TWO numbers per description. A sentence listing three or more statistics reads as a data sheet, not a stamp description. If you have multiple figures, pick the single most interesting one and drop the rest.
-
-PLACE TYPE GUIDANCE:
-- COUNTRY: geographic, natural, exploratory or cultural record. Never policy or political.
-- CITY: founding story, urban record, surprising structural or geographic fact
-- STREET or AVENUE: a famous historical event, notable resident, or cultural moment. No measurable claims like length or property values as these are disputed and fail verification.
-- BUILDING or LANDMARK: construction, engineering, or record-breaking detail
-- MUSEUM or INSTITUTION: collection size, founding story, or a well-documented record
-- PARK or NATURE: scale, age, geological or ecological fact. Use documented figures like acreage, not process quantities like cartloads.
-- ISLAND or ARCHIPELAGO: geological origin, coral reef facts, or well-documented geographic record. Avoid date line and meridian claims as these are frequently imprecise.
-- NEIGHBOURHOOD or DISTRICT: origin story, transformation, physical character. For DUMBO specifically, avoid the acronym coinage date as this is disputed across sources. The ballast stone cobblestone streets are a well-documented and verified angle.${seenHint}${retryHint}${correctionSeed}
+STRICT PROHIBITIONS — never include:
+  ✗ Visitor numbers or tourism rankings
+  ✗ Height, area, length, or any physical measurement
+  ✗ Record claims ("tallest", "oldest", "largest") unless the founding year itself is the fact
+  ✗ Population figures
+  ✗ Any statistic that requires a source beyond a founding/event year
 
 Respond ONLY with valid JSON, no markdown:
-{"fact":"the description here","country":"Full country name, e.g. United States of America"}`);
+{"fact":"the historical fact here","claim_type":"A|B|C|D"}`);
   const parsed = JSON.parse(raw);
-
-  if (parsed.fact && parsed.fact.includes('\u2014')) {
-    throw new Error(`Description contains a banned em dash character. Rewrite without using it.`);
+  if (!parsed.fact || parsed.fact.length < 150 || parsed.fact.length > 250) {
+    throw new Error(`Fact length out of range: ${parsed.fact?.length} chars`);
   }
-
-  if (!parsed.fact || parsed.fact.length < 150 || parsed.fact.length > 240) {
-    const len = parsed.fact?.length;
-    const dir = len > 240 ? `too long at ${len} chars, cut it down` : `too short at ${len} chars, expand it`;
-    throw new Error(`Description length out of range: ${dir}. Target is 160 to 220 characters, minimum 150, maximum 240.`);
+  if (!['A','B','C','D'].includes(parsed.claim_type)) {
+    throw new Error(`Invalid claim type: ${parsed.claim_type}`);
   }
-  return { fact: parsed.fact, country: parsed.country || '' };
+  return { fact: parsed.fact, claimType: parsed.claim_type };
 }
 
-// ── Step 2: Auto-verify against Wikipedia + second source ────────────────────
-async function autoVerifyFact(place, fact) {
-  // Extract the factual kernel and generate search queries
-  const raw = await callClaude(`You are a fact-checking assistant. Given this stamp description for "${place}":
+// ── Step 2a: Fetch real Wikipedia article text (free, no auth) ───────────────
+async function fetchWikipediaExtract(place) {
+  // Try exact title first, then a search fallback
+  const titleSlug = encodeURIComponent(place.replace(/ /g, '_'));
+  const summaryUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${titleSlug}`;
 
-"${fact}"
-
-This description has two parts: a verifiable factual claim, and an evocative closing phrase. Your job is to focus ONLY on the factual claim. Ignore the closing phrase entirely.
-
-Your task:
-1. Extract the single core verifiable claim (a specific number, record, date, engineering detail, geographic fact, etc.) that can be confirmed in encyclopaedias
-2. Generate 3 search queries to verify it: one targeting Wikipedia, one targeting an official or encyclopaedia source, one targeting a news or reference site
-3. Rate your confidence that the factual claim is accurate on a scale of 1-10
-
-Respond ONLY with valid JSON, no markdown:
-{
-  "key_claim": "the specific verifiable claim only, not the closing phrase",
-  "confidence": 8,
-  "queries": [
-    {"label": "Wikipedia", "q": "search query here", "type": "wikipedia"},
-    {"label": "Encyclopaedia / Official", "q": "search query here", "type": "official"},
-    {"label": "Reference & News", "q": "search query here", "type": "reference"}
-  ]
-}`, 600);
-
-  const parsed = JSON.parse(raw);
-  if (!parsed.queries || parsed.queries.length < 2) throw new Error('Verification query generation failed');
-
-  // Confidence gate: only reject if genuinely uncertain
-  if (parsed.confidence < 4) {
-    throw new Error(`Low confidence (${parsed.confidence}/10): factual claim may not be verifiable`);
+  let res = await fetch(summaryUrl);
+  if (!res.ok) {
+    // Fallback: use the Wikipedia search API to find the best matching article
+    const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(place)}&srlimit=1&format=json&origin=*`;
+    const searchRes = await fetch(searchUrl);
+    if (!searchRes.ok) throw new Error(`Wikipedia search failed for "${place}"`);
+    const searchData = await searchRes.json();
+    const topResult = searchData?.query?.search?.[0]?.title;
+    if (!topResult) throw new Error(`No Wikipedia article found for "${place}"`);
+    const fallbackSlug = encodeURIComponent(topResult.replace(/ /g, '_'));
+    res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${fallbackSlug}`);
+    if (!res.ok) throw new Error(`Wikipedia article fetch failed for "${place}"`);
   }
 
-  // Build source links for the verify panel
-  const sources = parsed.queries.map((item, j) => ({
-    label: item.label,
-    q: item.q,
-    type: item.type,
-    url: `https://www.google.com/search?q=${encodeURIComponent(item.q)}`,
-    iconBg: ICON_BG[j] || '#f0f0f0',
-    iconColor: ICON_COLOR[j] || '#555',
-    iconLetter: ICON_LETTER[j] || '?'
-  }));
+  const data = await res.json();
+  if (!data.extract || data.extract.length < 50) throw new Error(`Wikipedia article too short or missing for "${place}"`);
 
-  // Second pass: verify the factual kernel
-  const verifyRaw = await callClaude(`You are a fact-checker. Assess this specific verifiable claim:
+  return {
+    extract: data.extract,
+    title: data.title,
+    url: data.content_urls?.desktop?.page || `https://en.wikipedia.org/wiki/${titleSlug}`
+  };
+}
 
-Claim: "${parsed.key_claim}"
-Full description: "${fact}"
-Context (place): "${place}"
+// ── Step 2b: Cross-check fact against real Wikipedia text + build source links ─
+async function autoVerifyFact(place, factObj) {
+  const { fact, claimType } = factObj;
 
-Classify into one of three categories:
-1. CORRECT: factually accurate and well-documented in multiple reliable sources
-2. AMBIGUOUS: the core event or detail is real and documented, but a minor surrounding detail (e.g. exact day of month, year varying by 1 to 2 across sources) is uncertain. The substance is not wrong, just slightly imprecise.
-3. WRONG: contains a clear factual error, OR includes a specific number or quantity that cannot be independently confirmed in encyclopaedia-level sources
+  // Fetch real Wikipedia article — free, no Claude call needed
+  let wikiData;
+  try {
+    wikiData = await fetchWikipediaExtract(place);
+  } catch(e) {
+    throw new Error(`Wikipedia fetch failed: ${e.message}`);
+  }
 
-CRITICAL rule on numbers: if the claim contains a specific quantity and that exact figure is not confirmed in multiple reliable sources, classify as WRONG, not AMBIGUOUS. An unverifiable specific number is a fabricated statistic.
+  // Ask Claude to cross-check the fact against the ACTUAL Wikipedia text
+  // This is grounded verification — Claude is reading real content, not recalling from memory
+  const verifyRaw = await callClaude(`You are a strict fact-checker. You have been given the Wikipedia article extract for "${place}" and a historical fact to verify against it.
 
-BANNED CONTENT CHECK: Also classify as WRONG if the full description touches on any of these banned categories, regardless of factual accuracy:
-- Death, human remains, bones, burials, cemeteries, mass graves, executions or casualties
-- Disasters, famines, epidemics or atrocities
-Stamp descriptions must make someone want to visit a place. Content about death or tragedy must be rejected even if factually correct.
+WIKIPEDIA EXTRACT (authoritative source):
+"${wikiData.extract.substring(0, 1200)}"
+
+FACT TO VERIFY:
+"${fact}"
+
+CLAIM TYPE: ${claimType} (${
+    claimType === 'A' ? 'founding or construction year' :
+    claimType === 'B' ? 'UNESCO designation year' :
+    claimType === 'C' ? 'named historical event with year' :
+    'age derived from founding year'
+  })
+
+Your task:
+1. Identify the specific year or event being claimed in the fact
+2. Check whether the Wikipedia extract supports, contradicts, or is silent on this claim
+3. Extract the key claim being made (e.g. "built in 1173")
 
 Rules:
-- AMBIGUOUS is only for genuine minor date or phrasing uncertainty, not for unconfirmed quantities
-- Use WRONG for any specific figure that appears estimated or unverifiable
-- Use WRONG for any description touching banned content categories above
-- If WRONG, provide the corrected version in the correction field. If banned content is the problem, say "Choose a different angle about this place that does not involve death, remains or tragedy."
+- "supported" = the Wikipedia extract explicitly mentions the same year/event
+- "silent" = the extract doesn't mention it either way (treat as UNVERIFIED, not verified)
+- "contradicted" = the extract gives a different year/fact
 
+Only return verified:true if the extract EXPLICITLY supports the claim.
 Respond ONLY with valid JSON, no markdown:
-{"status": "CORRECT|AMBIGUOUS|WRONG", "note": "brief explanation", "correction": "corrected claim or empty string"}`, 400);
+{
+  "key_claim": "the specific claim e.g. 'constructed in 1173'",
+  "wiki_says": "what the Wikipedia extract says about this, verbatim or 'not mentioned'",
+  "verdict": "supported|silent|contradicted",
+  "verified": true or false,
+  "note": "brief explanation"
+}`, 400);
 
   const verifyResult = JSON.parse(verifyRaw);
 
-  if (verifyResult.status === 'WRONG') {
-    const correction = verifyResult.correction ? ` Corrected version: "${verifyResult.correction}"` : '';
-    const err = new Error(`Factual claim is incorrect: ${verifyResult.note}${correction}`);
-    err.rejectionType = 'factual_error';
-    throw err;
+  if (!verifyResult.verified) {
+    throw new Error(`Wikipedia ${verifyResult.verdict}: ${verifyResult.note}`);
   }
+
+  // Build source links — Wikipedia link is now a real article URL, not just a search
+  const sources = [
+    {
+      label: 'Wikipedia',
+      q: verifyResult.key_claim,
+      type: 'wikipedia',
+      url: wikiData.url,
+      iconBg: ICON_BG[0],
+      iconColor: ICON_COLOR[0],
+      iconLetter: 'W'
+    },
+    {
+      label: 'Encyclopaedia / Official',
+      q: `${place} ${verifyResult.key_claim} history`,
+      type: 'official',
+      url: `https://www.google.com/search?q=${encodeURIComponent(place + ' ' + verifyResult.key_claim + ' site:britannica.com OR site:history.com')}`,
+      iconBg: ICON_BG[1],
+      iconColor: ICON_COLOR[1],
+      iconLetter: 'O'
+    },
+    {
+      label: 'Reference & News',
+      q: `${place} ${verifyResult.key_claim}`,
+      type: 'reference',
+      url: `https://www.google.com/search?q=${encodeURIComponent(place + ' ' + verifyResult.key_claim)}`,
+      iconBg: ICON_BG[2],
+      iconColor: ICON_COLOR[2],
+      iconLetter: 'N'
+    }
+  ];
 
   return {
     sources,
-    confidence: parsed.confidence,
-    key_claim: parsed.key_claim,
+    key_claim: verifyResult.key_claim,
+    wiki_says: verifyResult.wiki_says,
     verifyNote: verifyResult.note,
-    isAmbiguous: verifyResult.status === 'AMBIGUOUS'
+    wikiTitle: wikiData.title,
+    wikiUrl: wikiData.url
   };
 }
 
 // ── Step 3: Full pipeline — generate + verify, with retries ──────────────────
-async function generateAndVerify(place, onStatusUpdate, seenFacts = []) {
+async function generateAndVerify(place, onStatusUpdate) {
   let lastError = '';
-  const allErrors = [];
-  const corrections = [];
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      onStatusUpdate(`Generating stamp description (attempt ${attempt}/${MAX_RETRIES})${attempt > 1 ? ', retrying with different approach...' : ''}`, attempt);
-      const { fact, country } = await generateCandidateFact(place, lastError, allErrors, corrections, seenFacts);
+      onStatusUpdate(`Generating historical fact (attempt ${attempt}/${MAX_RETRIES})${attempt > 1 ? ' — retrying after failed verification…' : ''}`, attempt);
+      const factObj = await generateCandidateFact(place);
 
-      onStatusUpdate(`Verifying factual claim…`, attempt);
-      const verifyData = await autoVerifyFact(place, fact);
+      onStatusUpdate(`Checking against live Wikipedia article…`, attempt);
+      const verifyData = await autoVerifyFact(place, factObj);
 
-      return { fact, country, ...verifyData };
+      // Passed — return everything
+      return { fact: factObj.fact, claimType: factObj.claimType, ...verifyData };
     } catch(e) {
       lastError = e.message;
-      allErrors.push(e.message);
-      const corrMatch = e.message.match(/(?:Corrected version|Suggested fix): "([^"]+)"/);
-      if (corrMatch) corrections.push(corrMatch[1]);
       if (attempt < MAX_RETRIES) await sleep(800);
     }
   }
-  throw new Error(`Could not produce a verified description after ${MAX_RETRIES} attempts. Last error: ${lastError}`);
+  throw new Error(`Could not produce a verified fact after ${MAX_RETRIES} attempts. Last error: ${lastError}`);
 }
 
 // ── Render a verified fact card ───────────────────────────────────────────────
 function renderFactCard(container, place, result, prefix) {
-  const storeId = storeFact(result.fact, result.sources, place);
+  const storeId = storeFact(result.fact, result.sources);
 
   const card = document.createElement('div');
   card.className = 'fact-card';
   card.id = `card-${prefix}`;
 
   const sourcesHtml = result.sources.map((s, j) => {
-    const shortQ = s.q.length > 60 ? s.q.substring(0,60)+'…' : s.q;
+    const shortQ = (s.q||'').length > 60 ? s.q.substring(0,60)+'…' : (s.q||'');
+    const isWiki = s.type === 'wikipedia';
     return `<a class="source-link" href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">
       <div class="source-icon" style="background:${s.iconBg};color:${s.iconColor}">${s.iconLetter}</div>
       <div class="source-info">
-        <div class="source-title">${esc(s.label)}</div>
-        <div class="source-desc">${esc(shortQ)}</div>
+        <div class="source-title">${esc(s.label)}${isWiki ? ' <span style="font-size:10px;color:#1a6b3a;font-weight:600">✓ verified here</span>' : ''}</div>
+        <div class="source-desc">${isWiki && result.wikiTitle ? esc(result.wikiTitle) : esc(shortQ)}</div>
       </div>
       <span class="source-arrow">→</span>
     </a>`;
   }).join('');
 
+  const wikiSaysHtml = result.wiki_says && result.wiki_says !== 'not mentioned'
+    ? `<div style="margin-top:10px;padding:8px 10px;background:#f0f7f0;border-radius:7px;border-left:3px solid #86d9a5;font-size:12px;color:#2a5a3a;line-height:1.5">
+        <strong style="font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:#1a6b3a">Wikipedia says:</strong><br>
+        "${esc(result.wiki_says.substring(0, 200))}${result.wiki_says.length > 200 ? '…' : ''}"
+       </div>`
+    : '';
+
   card.innerHTML = `
     <div class="fact-card-header">
       <span class="fact-verified-badge">
         <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.3"/><path d="M5 8.5l2 2 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        ${result.isAmbiguous ? 'Verified (approx.)' : 'Verified'}
+        Wikipedia verified
       </span>
-      <span class="fact-type-label">Stamp description</span>
+      <span class="fact-type-label">Historical fact</span>
     </div>
-    <div class="fact-stamp-intro">You got this stamp by visiting ${esc(place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' '))}.</div>
     <div class="fact-text">${esc(result.fact)}</div>
     <div class="fact-foot">
       <span class="char-count">${result.fact.length} chars</span>
@@ -843,17 +812,13 @@ function renderFactCard(container, place, result, prefix) {
         <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 8.5l1.8 1.8 3.2-3.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         View sources
       </button>
-      <button class="verify-btn" data-action="refresh-fact" data-place="${esc(place)}" data-prefix="${prefix}">
-        <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M13.5 2.5A6.5 6.5 0 1 1 7 1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><polyline points="10 1 7 1 7 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        New description
-      </button>
       <button class="copy-fact-btn" data-action="copy-fact" data-store-id="${storeId}">Copy</button>
     </div>
     <div class="sources-panel" id="sources-${prefix}">
-      <div class="sources-heading">Sources used to verify this description</div>
+      <div class="sources-heading">Verified against live Wikipedia</div>
       <div class="source-links">${sourcesHtml}</div>
-      ${result.isAmbiguous ? `<p class="sources-note" style="color:#b06000;background:#fef3e2;border-radius:6px;padding:8px 10px;margin-bottom:8px">⚠ Minor ambiguity: ${esc(result.verifyNote)} The core fact is correct but a specific detail may vary across sources.</p>` : ''}
-      <p class="sources-note">Each link opens a targeted Google search. The factual claim was automatically verified against these sources before being shown to you.</p>
+      ${wikiSaysHtml}
+      <p class="sources-note" style="margin-top:10px">The Wikipedia source link goes directly to the article. The fact was cross-checked against the live article text — not Claude's memory — before being accepted.</p>
     </div>`;
 
   container.innerHTML = '';
@@ -879,26 +844,7 @@ function handleCardClick(e) {
   }
 
   if (action === 'copy-fact' && stored) {
-    const fullText = stored.place
-      ? `You got this stamp by visiting ${stored.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ')}.\n\n${stored.fact}`
-      : stored.fact;
-    copyToClipboard(fullText, btn);
-  }
-
-  if (action === 'refresh-fact') {
-    const place = btn.dataset.place;
-    const prefix = btn.dataset.prefix;
-    if (!place) return;
-    btn.disabled = true;
-    btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M13.5 2.5A6.5 6.5 0 1 1 7 1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><polyline points="10 1 7 1 7 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg> Generating…`;
-    if (prefix === 's') {
-      // Single mode — re-run the whole single generate
-      generateSingle();
-    } else {
-      // Batch mode — extract index from prefix "b{i}" and retry that item
-      const i = parseInt(prefix.replace('b', ''));
-      if (!isNaN(i)) retryItem(i);
-    }
+    copyToClipboard(stored.fact, btn);
   }
 
   if (action === 'db-export-session') {
@@ -929,69 +875,11 @@ function handleCardClick(e) {
 }
 
 // ── Single generate ───────────────────────────────────────────────────────────
-// ── Per-item generation (used by batch run and retry buttons) ─────────────────
-async function generateItemAt(i, place, group) {
-  const loadingEl = document.createElement('div');
-  loadingEl.className = 'loading';
-  loadingEl.id = `group-loading-${i}`;
-  loadingEl.style.cssText = 'padding:1rem 0;font-size:13px';
-  loadingEl.innerHTML = `Generating &amp; verifying description${dots()}<div class="loading-step"></div>`;
-
-  const existing = group.querySelector('.fact-card, .item-error');
-  if (existing) existing.replaceWith(loadingEl);
-  else group.appendChild(loadingEl);
-
-  try {
-    const result = await generateAndVerify(place, (msg, attempt) => {
-      const el = document.getElementById(`group-loading-${i}`);
-      if (el) el.innerHTML = `${esc(msg)}${dots()}<div class="loading-step">${attempt>1?'Attempt '+attempt+' of '+MAX_RETRIES:''}</div>`;
-    }, getSeenFacts(place));
-
-    batchResults[i].fact = result.fact;
-    batchResults[i].country = result.country;
-    batchResults[i].sources = result.sources;
-    batchResults[i].error = null;
-
-    const factDiv = document.createElement('div');
-    renderFactCard(factDiv, place, result, `b${i}`);
-    const loadingDone = document.getElementById(`group-loading-${i}`);
-    if (loadingDone) loadingDone.replaceWith(factDiv.firstChild);
-    dbAddEntry(place, result.fact, result.sources, CURRENT_SESSION_ID, result.country);
-    recordSeenFact(place, result.fact);
-    updateBadge();
-
-  } catch(e) {
-    batchResults[i].error = e.message;
-    const errDiv = document.createElement('div');
-    errDiv.className = 'item-error';
-    errDiv.style.cssText = 'font-size:13px;color:#c00;padding:8px 0';
-    errDiv.innerHTML = `<strong>Could not verify a description for this place.</strong><br>
-      <span style="color:#aaa;font-size:12px">${esc(e.message)}</span><br>
-      <button class="retry-btn" onclick="retryItem(${i})">
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M13.5 2.5A6.5 6.5 0 1 1 7 1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><polyline points="10 1 7 1 7 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Try again
-      </button>`;
-    const loadingErr = document.getElementById(`group-loading-${i}`);
-    if (loadingErr) loadingErr.replaceWith(errDiv);
-    else group.appendChild(errDiv);
-  }
-}
-
-// ── Retry a single batch item by index ────────────────────────────────────────
-async function retryItem(i) {
-  const item = batchResults[i];
-  if (!item) return;
-  const group = document.getElementById(`group-${i}`);
-  if (!group) return;
-  const btn = group.querySelector('.retry-btn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Retrying…'; }
-  await generateItemAt(i, item.place, group);
-}
-
 async function generateSingle() {
   const q = document.getElementById('q').value.trim();
   if (!q) return;
 
+  // New session ID for this run
   CURRENT_SESSION_ID = 'session_' + Date.now();
 
   const btn = document.getElementById('btn-single');
@@ -1009,20 +897,15 @@ async function generateSingle() {
       const step = document.getElementById('status-step');
       if (el) el.innerHTML = `${esc(msg)}${dots()}`;
       if (step) step.textContent = attempt > 1 ? `Attempt ${attempt} of ${MAX_RETRIES}` : '';
-    }, getSeenFacts(q));
+    });
 
     renderFactCard(results, q, result, 's');
-    dbAddEntry(q, result.fact, result.sources, CURRENT_SESSION_ID, result.country);
-    recordSeenFact(q, result.fact);
+    dbAddEntry(q, result.fact, result.sources, CURRENT_SESSION_ID);
 
   } catch(e) {
     results.innerHTML = `<div class="error-msg">
       ${esc(e.message)}<br>
-      <small style="color:#aaa;margin-top:6px;display:block">No verifiable description could be confirmed. Try being more specific — e.g. a named building or landmark rather than a broad area.</small>
-      <button class="retry-btn" style="margin-top:12px" onclick="generateSingle()">
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M13.5 2.5A6.5 6.5 0 1 1 7 1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><polyline points="10 1 7 1 7 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Try again
-      </button>
+      <small style="color:#aaa;margin-top:6px;display:block">This usually means the topic is too obscure or the fact couldn't be independently verified. Try a well-known landmark or city.</small>
     </div>`;
   }
 
@@ -1043,15 +926,6 @@ function clearFile() {
 }
 
 function processFile(file) {
-  // Always reset state before processing a new file
-  sheetData = [];
-  document.getElementById('sheet-picker').classList.remove('visible');
-  document.getElementById('sheet-list').innerHTML = '';
-  document.getElementById('sheet-total').textContent = '';
-  document.getElementById('results-batch').innerHTML = '';
-  document.getElementById('export-bar').classList.remove('visible');
-  document.getElementById('progress-wrap').classList.remove('visible');
-
   const ext = file.name.split('.').pop().toLowerCase();
   const iconEl = document.getElementById('file-icon');
   iconEl.textContent = ext.toUpperCase();
@@ -1069,11 +943,12 @@ function processFile(file) {
       const cols = lines[0].split(',').map(c=>c.replace(/^"|"$/g,'').trim());
       if (cols.length > 1) {
         sheetData = [{ sheetName: file.name, headers: cols, rows: lines.slice(1).map(l=>l.split(',').map(c=>c.replace(/^"|"$/g,'').trim())), selectedCol: 0, enabled: true }];
+        showSheetPicker();
       } else {
         sheetData = [{ sheetName: file.name, headers: ['Place'], rows: lines.map(l=>[l]), selectedCol: 0, enabled: true }];
+        hideSheetPicker();
       }
       document.getElementById('file-meta').textContent = `${sheetData[0].rows.length} rows detected`;
-      showSheetPicker();
     };
     reader.readAsText(file);
   } else if (ext==='xlsx'||ext==='xls') {
@@ -1173,7 +1048,7 @@ async function generateBatch() {
 
   const btn = document.getElementById('btn-batch');
   btn.disabled = true; btn.textContent = 'Generating…';
-  batchResults = allPlaces.map(p=>({ place: p.place, sheet: p.sheet, row: p.row, headers: p.headers, selectedCol: p.selectedCol, fact: null, country: '', sources: null, error: null }));
+  batchResults = allPlaces.map(p=>({ place: p.place, sheet: p.sheet, row: p.row, headers: p.headers, selectedCol: p.selectedCol, fact: null, sources: null, error: null }));
 
   const pw=document.getElementById('progress-wrap'), pb=document.getElementById('progress-bar');
   const pl=document.getElementById('progress-label'), pc=document.getElementById('progress-count');
@@ -1201,124 +1076,94 @@ async function generateBatch() {
 
     const group = document.createElement('div');
     group.className = 'place-group'; group.id = `group-${i}`;
-    group.innerHTML = `<div class="place-heading"><div class="place-num">${i+1}</div><span>${esc(place)}</span></div>`;
+    group.innerHTML = `
+      <div class="place-heading"><div class="place-num">${i+1}</div><span>${esc(place)}</span></div>
+      <div class="loading" id="group-loading-${i}" style="padding:1rem 0;font-size:13px">
+        Generating &amp; verifying${dots()}
+        <div class="loading-step" id="group-step-${i}"></div>
+      </div>`;
     container.appendChild(group);
     group.scrollIntoView({ behavior:'smooth', block:'nearest' });
 
-    await generateItemAt(i, place, group);
+    try {
+      const result = await generateAndVerify(place, (msg, attempt) => {
+        const el = document.getElementById(`group-loading-${i}`);
+        const step = document.getElementById(`group-step-${i}`);
+        if (el) el.innerHTML = `${esc(msg)}${dots()}<div class="loading-step">${attempt>1?'Attempt '+attempt+' of '+MAX_RETRIES:''}</div>`;
+      });
+
+      batchResults[i].fact = result.fact;
+      batchResults[i].sources = result.sources;
+
+      const factDiv = document.createElement('div');
+      renderFactCard(factDiv, place, result, `b${i}`);
+      group.querySelector(`#group-loading-${i}`).replaceWith(factDiv.firstChild);
+      dbAddEntry(place, result.fact, result.sources, CURRENT_SESSION_ID);
+
+    } catch(e) {
+      batchResults[i].error = e.message;
+      const errDiv = document.createElement('div');
+      errDiv.style.cssText = 'font-size:13px;color:#c00;padding:8px 0';
+      errDiv.innerHTML = `<strong>Could not verify a fact for this place.</strong><br><span style="color:#aaa">${esc(e.message)}</span>`;
+      group.querySelector(`#group-loading-${i}`).replaceWith(errDiv);
+    }
     if (i < allPlaces.length-1) await sleep(600);
   }
 
   pl.textContent = 'All done!';
   pc.textContent = `${allPlaces.length} / ${allPlaces.length}`;
   pb.style.width = '100%';
-  btn.disabled = false; btn.textContent = 'Generate stamp descriptions for all places';
-  const uniqueSheets = [...new Set(batchResults.map(r => r.sheet).filter(Boolean))];
-  const exportLabel = uniqueSheets.length > 1
-    ? `All done — ${uniqueSheets.length} tabs ready to export as Excel`
-    : 'All done — export facts as Excel';
-  document.getElementById('export-bar-text').textContent = exportLabel;
+  btn.disabled = false; btn.textContent = 'Generate verified facts for all places';
   document.getElementById('export-bar').classList.add('visible');
   updateBadge();
 }
 
-function exportBatchXLSX() {
+function exportBatchCSV() {
   if (!batchResults.length) return;
 
-  const wb = XLSX.utils.book_new();
-
-  // Group results by their source sheet name, preserving insertion order
-  const sheetGroups = new Map(); // sheetName -> [result, ...]
-  batchResults.forEach(r => {
-    const name = r.sheet || 'Sheet1';
-    if (!sheetGroups.has(name)) sheetGroups.set(name, []);
-    sheetGroups.get(name).push(r);
+  // Collect all unique original headers across all sheets in order of appearance,
+  // excluding the place-name column itself (we already have it as 'Place')
+  const seenHeaders = [];
+  const extraColsByResult = batchResults.map(r => {
+    const extras = {};
+    if (r.headers && r.row) {
+      r.headers.forEach((h, ci) => {
+        if (ci === r.selectedCol) return; // skip the place column — already included
+        const label = h || `Column ${ci + 1}`;
+        if (!seenHeaders.includes(label)) seenHeaders.push(label);
+        extras[label] = String(r.row[ci] || '');
+      });
+    }
+    return extras;
   });
 
-  sheetGroups.forEach((results, sheetName) => {
-    // Collect extra original columns for this sheet's results only
-    const seenHeaders = [];
-    const extraColsByResult = results.map(r => {
-      const extras = {};
-      if (r.headers && r.row) {
-        r.headers.forEach((h, ci) => {
-          if (ci === r.selectedCol) return;
-          const label = h || `Column ${ci + 1}`;
-          if (!seenHeaders.includes(label)) seenHeaders.push(label);
-          extras[label] = String(r.row[ci] || '');
-        });
-      }
-      return extras;
-    });
+  // Build header row: original extra columns first, then our generated columns
+  const headerRow = [
+    'Place',
+    'Sheet',
+    ...seenHeaders,
+    'Verified Historical Fact',
+    'Char Count',
+    'Status',
+    'Failure Reason',
+    'Source 1',
+    'Source 2',
+    'Source 3'
+  ];
 
-    // Header row — original extra cols first, then generated cols
-    const headerRow = [
-      'Place',
-      'Country',
-      ...seenHeaders,
-      'Stamp Description',
-      'Char Count',
-      'Status',
-      'Failure Reason',
-      'Source 1',
-      'Source 2',
-      'Source 3'
-    ];
+  const rows = [headerRow];
 
-    const rows = [headerRow];
-    results.forEach((r, i) => {
-      const extras = seenHeaders.map(h => extraColsByResult[i][h] || '');
-      const capPlace = r.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
-      if (r.fact) {
-        // Use actual CRLF character (char code 13+10) — Excel requires this for in-cell line breaks
-        const CRLF = '\r\n';
-        const fullDesc = `You got this stamp by visiting ${capPlace}.${CRLF}${CRLF}${r.fact}`;
-        const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
-        rows.push([r.place, r.country||'', ...extras, fullDesc, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
-      } else {
-        rows.push([r.place, r.country||'', ...extras, '', '', 'Failed', r.error||'Could not produce a verified description after 4 attempts', '', '', '']);
-      }
-    });
-
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-
-    ws['!cols'] = [
-      { wch: 30 },  // Place
-      { wch: 24 },  // Country
-      ...seenHeaders.map(() => ({ wch: 20 })),
-      { wch: 80 },  // Stamp Description (merged)
-      { wch: 10 },  // Char Count
-      { wch: 10 },  // Status
-      { wch: 40 },  // Failure Reason
-      { wch: 50 },  // Source 1
-      { wch: 50 },  // Source 2
-      { wch: 50 },  // Source 3
-    ];
-
-    // Apply wrap text to description column cells so \r\n line breaks render in Excel
-    // Must set cellStyles:true in write options AND patch cells directly after aoa_to_sheet
-    const descColIndex = 2 + seenHeaders.length;
-    Object.keys(ws).forEach(addr => {
-      if (addr[0] === '!') return;
-      const cell = XLSX.utils.decode_cell(addr);
-      if (cell.c === descColIndex) {
-        ws[addr].s = { alignment: { wrapText: true, vertical: 'top' } };
-      } else {
-        ws[addr].s = { alignment: { vertical: 'top' } };
-      }
-    });
-
-    // Sanitise sheet name — Excel limits to 31 chars, no special chars
-    const safeName = sheetName.replace(/[:\\\/\?\*\[\]]/g, '').substring(0, 31);
-    XLSX.utils.book_append_sheet(wb, ws, safeName);
+  batchResults.forEach((r, i) => {
+    const extras = seenHeaders.map(h => extraColsByResult[i][h] || '');
+    if (r.fact) {
+      const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
+      rows.push([r.place, r.sheet||'', ...extras, r.fact, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
+    } else {
+      rows.push([r.place, r.sheet||'', ...extras, '', '', 'Failed', r.error||'Could not produce a verified fact after 3 attempts', '', '', '']);
+    }
   });
 
-  // Write and trigger download
-  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array', cellStyles: true });
-  const blob = new Blob([wbout], { type: 'application/octet-stream' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = 'facts-export.xlsx'; a.click();
-  URL.revokeObjectURL(url);
+  downloadCSV(rows, 'facts-export.csv');
 }
 
 // ── History ────────────────────────────────────────────────────────────────────
@@ -1437,12 +1282,10 @@ function clearHistory() {
 function exportSessionCSV(sessionId, sessionDate) {
   const records = dbLoad().filter(r => (r.sessionId || 'legacy') === sessionId);
   if (!records.length) { alert('No entries found for this session.'); return; }
-  const rows = [['Place', 'Country', 'Stamp Description', 'Char Count', 'Status', 'Source 1', 'Source 2', 'Source 3']];
+  const rows = [['Place', 'Date', 'Verified Historical Fact', 'Char Count', 'Status', 'Source 1', 'Source 2', 'Source 3']];
   records.forEach(r => {
     const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
-    const capPlace = r.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
-    const fullDesc = r.fact ? `You got this stamp by visiting ${capPlace}.\n\n${r.fact}` : '';
-    rows.push([r.place, r.country||'', fullDesc, (r.fact||'').length, r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
+    rows.push([r.place, fmtDate(r.date), r.fact||'', (r.fact||'').length, r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
   });
   // Label filename with session datetime
   const dateSlug = sessionDate ? new Date(sessionDate).toISOString().replace(/[:.]/g,'-').substring(0,19) : 'session';
@@ -1452,13 +1295,11 @@ function exportSessionCSV(sessionId, sessionDate) {
 function exportHistoryCSV() {
   const records = dbLoad();
   if (!records.length) { alert('No history to export.'); return; }
-  const rows = [['Place', 'Country', 'Stamp Description', 'Char Count', 'Session', 'Date', 'Status', 'Source 1', 'Source 2', 'Source 3']];
+  const rows = [['Place', 'Session', 'Date', 'Verified Historical Fact', 'Char Count', 'Status', 'Source 1', 'Source 2', 'Source 3']];
   records.forEach(r => {
     const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
-    const capPlace = r.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
-    const fullDesc = r.fact ? `You got this stamp by visiting ${capPlace}.\n\n${r.fact}` : '';
     const sessionLabel = r.sessionId ? fmtDate(new Date(parseInt(r.sessionId.replace('session_',''))).toISOString()) : 'Legacy';
-    rows.push([r.place, r.country||'', fullDesc, (r.fact||'').length, sessionLabel, fmtDate(r.date), r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
+    rows.push([r.place, sessionLabel, fmtDate(r.date), r.fact||'', (r.fact||'').length, r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
   });
   downloadCSV(rows, 'facts-history-all.csv');
 }
