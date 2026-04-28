@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Fact Generator v37</title>
+  <title>Fact Generator v38</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -292,7 +292,7 @@
 <div class="container" id="app-screen">
   <div class="topbar">
     <div class="topbar-left">
-      <h1>Fact Generator <span style="font-size:13px;font-weight:400;color:#bbb;letter-spacing:0.02em">v37</span></h1>
+      <h1>Fact Generator <span style="font-size:13px;font-weight:400;color:#bbb;letter-spacing:0.02em">v38</span></h1>
       <p>One verified stamp description per place — shown with stamp framing line, factual claim confirmed before display</p>
     </div>
     <div class="topbar-right">
@@ -711,8 +711,41 @@ async function generateCandidateFact(place, wikiFactList, lastError = '', allErr
     : '';
 
   const errorHistory = allErrors.map((e, i) => (i+1) + '. ' + e).join('\n');
+
+  // Detect which fact categories have already been rejected this round
+  // so we can force the generator to switch to a completely different angle
+  const rejectedCategoryKeywords = {
+    'border': 'borders/neighbouring countries',
+    'neighbour': 'borders/neighbouring countries',
+    'shares land': 'borders/neighbouring countries',
+    'island': 'island counts',
+    'coastline': 'coastline length',
+    'skyscraper': 'skyscrapers/buildings',
+    'seikan': 'specific sub-location (needs its own Wikipedia article)',
+    'tunnel': 'specific sub-location (needs its own Wikipedia article)',
+    'bridge': 'specific sub-location (needs its own Wikipedia article)',
+    'lake': 'lakes',
+    'mountain': 'mountains/elevation',
+    'population': 'population statistics',
+    'largest': 'size/area records',
+    'smallest': 'size/area records',
+    'oldest': 'age records',
+    'colony': 'colonial history',
+  };
+  const rejectedCategories = [];
+  allErrors.forEach(e => {
+    Object.entries(rejectedCategoryKeywords).forEach(([kw, cat]) => {
+      if (e.toLowerCase().includes(kw) && !rejectedCategories.includes(cat)) {
+        rejectedCategories.push(cat);
+      }
+    });
+  });
+  const rejectedBlock = rejectedCategories.length > 0
+    ? '\n\nCATEGORIES THAT HAVE ALREADY FAILED — do not attempt these again, pick a completely different angle:\n' + rejectedCategories.map(c => '- ' + c).join('\n')
+    : '';
+
   const retryHint = allErrors.length > 0 && corrections.length === 0
-    ? '\n\nIMPORTANT: your previous ' + allErrors.length + ' attempt(s) failed:\n' + errorHistory + '\n\nProduce something genuinely different. If a specific claim was rejected, do not try it again.'
+    ? '\n\nIMPORTANT: your previous ' + allErrors.length + ' attempt(s) failed:\n' + errorHistory + rejectedBlock + '\n\nYou MUST choose a completely different fact category. Do not rephrase a rejected claim.'
     : '';
 
   // Fix 1: Category diversity — tell Claude which categories are already saturated
@@ -736,9 +769,19 @@ async function generateCandidateFact(place, wikiFactList, lastError = '', allErr
   const stampIntroPlace = placeNeedsThe ? 'the ' + place : place;
 
   // Build the confirmed facts block — Claude can ONLY use these
-  const factsBlock = wikiFactList && wikiFactList.length > 0
+  // Filter out facts from rejected categories so retries don't keep hitting the same wall
+  const filteredWikiFactList = wikiFactList && rejectedCategories.length > 0
+    ? wikiFactList.filter(f => {
+        const claimLow = (f.claim + ' ' + f.source_quote).toLowerCase();
+        return !Object.keys(rejectedCategoryKeywords).some(kw => claimLow.includes(kw) &&
+          rejectedCategories.includes(rejectedCategoryKeywords[kw]));
+      })
+    : wikiFactList;
+  const factsToUse = (filteredWikiFactList && filteredWikiFactList.length > 0) ? filteredWikiFactList : wikiFactList;
+
+  const factsBlock = factsToUse && factsToUse.length > 0
     ? '\n\nWIKIPEDIA-CONFIRMED FACTS — you MUST base your description on one of these. Do not use any dates, years, records, or statistics not in this list:\n' +
-      wikiFactList.map((f, i) => `  ${i+1}. [${f.type}] ${f.claim} — source: "${f.source_quote}"`).join('\n')
+      factsToUse.map((f, i) => `  ${i+1}. [${f.type}] ${f.claim} — source: "${f.source_quote}"`).join('\n')
     : '\n\nNo Wikipedia article was available. Use only facts you are highly confident (9/10+) are accurate. If uncertain, describe the place without specific numbers.';
 
   const raw = await callClaude(`You are a writer creating stamp descriptions for a passport collectible app. Each description is a single, self-contained factual sentence about a real place.
@@ -766,6 +809,15 @@ BAD EXAMPLES — do not produce facts like these:
 - Facts about languages spoken in many countries (not intrinsic)
 - Facts about immigration or population demographics
 - Island counts, coastline lengths, or border counts if these categories are already overused in this batch
+
+LANGUAGE THAT IS STRICTLY FORBIDDEN — do not use any of these phrases under any circumstances:
+- "more than any other country / city / region / nation"
+- "one of the largest / smallest / oldest / most / fewest / highest / lowest"
+- "among the world's most / least"
+- Any ordinal ranking: "fourth-largest", "second-most", "third-highest" etc.
+- "the only country / city / place that..."  — unless you are 100% certain and it is in the Wikipedia-confirmed facts list
+- "world record", "world's first" — unless explicitly in the Wikipedia-confirmed facts list
+If you find yourself wanting to use any of these phrases, choose a different fact entirely.
 
 BANNED FACT CATEGORIES — these will be automatically rejected:
 - Politics, elections, voting systems or political parties
