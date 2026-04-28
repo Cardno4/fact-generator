@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Fact Generator v35</title>
+  <title>Fact Generator v36</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -292,7 +292,7 @@
 <div class="container" id="app-screen">
   <div class="topbar">
     <div class="topbar-left">
-      <h1>Fact Generator <span style="font-size:13px;font-weight:400;color:#bbb;letter-spacing:0.02em">v35</span></h1>
+      <h1>Fact Generator <span style="font-size:13px;font-weight:400;color:#bbb;letter-spacing:0.02em">v36</span></h1>
       <p>One verified stamp description per place — shown with stamp framing line, factual claim confirmed before display</p>
     </div>
     <div class="topbar-right">
@@ -727,8 +727,12 @@ async function generateCandidateFact(place, wikiFactList, lastError = '', allErr
   const countryGuidance = `\n\nCOUNTRY-LEVEL FACT RULE: The fact must be intrinsic to ${place} itself — not something that is equally true of neighbouring countries, shared rivers, or linguistic communities that exist elsewhere. Ask: "Could this fact be written about a different country?" If yes, choose a different fact.`;
 
   // Fix 5: Article capitalisation for place names with "the"
+  // Places that take "the" as an article
   const theCountries = ['united arab emirates', 'czech republic', 'philippines', 'united states', 'united kingdom', 'netherlands', 'bahamas', 'maldives', 'seychelles', 'comoros', 'solomon islands', 'marshall islands', 'cayman islands', 'faroe islands', 'turks and caicos'];
-  const placeNeedsThe = theCountries.some(c => place.toLowerCase().includes(c));
+  // Institutions/venues that take "the" (museums, galleries, libraries, etc.)
+  const theInstitutions = ['museum', 'gallery', 'galleries', 'library', 'libraries', 'theatre', 'theater', 'palace', 'cathedral', 'basilica', 'colosseum', 'parthenon', 'pantheon', 'louvre', 'hermitage', 'smithsonian', 'metropolitan', 'british museum', 'national museum', 'natural history', 'science museum', 'art institute', 'guggenheim', 'tate ', 'uffizi', 'prado', 'rijksmuseum', 'acropolis', 'forum', 'colossus', 'forbidden city', 'great wall', 'eiffel tower', 'taj mahal', 'opera house'];
+  const placeLow = place.toLowerCase();
+  const placeNeedsThe = theCountries.some(c => placeLow.includes(c)) || theInstitutions.some(i => placeLow.includes(i));
   const stampIntroPlace = placeNeedsThe ? 'the ' + place : place;
 
   // Build the confirmed facts block — Claude can ONLY use these
@@ -818,7 +822,7 @@ async function autoVerifyFact(place, fact, wikiData) {
     iconBg: ICON_BG[j] || '#f0f0f0', iconColor: ICON_COLOR[j] || '#555', iconLetter: ICON_LETTER[j] || '?'
   }));
 
-  const verifyRaw = await callClaude(`You are a fact-checker. Assess this specific verifiable claim:\n\nClaim: "${parsed.key_claim}"\nFull description: "${fact}"\nContext (place): "${place}"${wikiContext}\n\nClassify into one of three categories:\n1. CORRECT: factually accurate and well-documented\n2. AMBIGUOUS: core event is real but a minor detail (e.g. year varying by 1-2 across sources) is uncertain\n3. WRONG: clear factual error, unverifiable specific number, OR touches any banned category\n\nBANNED CATEGORY CHECK — classify as WRONG if the description touches any of these, regardless of factual accuracy:\n- Immigration, expat populations, demographic breakdown by nationality or origin\n- Death, human remains, burials, cemeteries, executions, disasters or tragedies\n- Politics, elections, laws, military policy, economic policy\n- Facts that are not intrinsic to the named place (e.g. a river that flows through 11 countries is not a fact about one country)\n\nIf WRONG, provide a corrected version or suggest a different angle.\n\nRespond ONLY with valid JSON, no markdown:\n{"status": "CORRECT|AMBIGUOUS|WRONG", "note": "brief explanation", "correction": "corrected claim or empty string"}`, 400);
+  const verifyRaw = await callClaude(`You are a fact-checker. Assess this specific verifiable claim:\n\nClaim: "${parsed.key_claim}"\nFull description: "${fact}"\nContext (place): "${place}"${wikiContext}\n\nClassify into one of three categories:\n1. CORRECT: factually accurate and well-documented\n2. AMBIGUOUS: core event is real but a minor detail (e.g. year varying by 1-2 across sources) is uncertain\n3. WRONG: clear factual error, unverifiable specific number, soft record claim, OR touches any banned category\n\nSOFT RECORD CHECK — classify as WRONG if the description contains any of the following without an explicit Wikipedia source quote to back it up:\n- "one of the largest / smallest / oldest / most / fewest / highest / lowest"\n- "more than any other country / city / region"\n- "among the world's most / least"\n- Any ranking claim (e.g. "fourth-largest", "second-most")\n- Any claim using "world record" without a specific named record holder\nIf the Wikipedia extract explicitly states the record, it may be CORRECT. If it is hedged or implied, it is WRONG.\n\nBANNED CATEGORY CHECK — classify as WRONG if the description touches any of these, regardless of factual accuracy:\n- Immigration, expat populations, demographic breakdown by nationality or origin\n- Death, human remains, burials, cemeteries, executions, disasters or tragedies\n- Politics, elections, laws, military policy, economic policy\n- Facts that are not intrinsic to the named place (e.g. a river that flows through 11 countries is not a fact about one country)\n\nIf WRONG, provide a corrected version or suggest a different angle.\n\nRespond ONLY with valid JSON, no markdown:\n{"status": "CORRECT|AMBIGUOUS|WRONG", "note": "brief explanation", "correction": "corrected claim or empty string"}`, 400);
 
   const verifyResult = JSON.parse(verifyRaw);
   if (verifyResult.status === 'WRONG') {
@@ -912,7 +916,7 @@ function renderFactCard(container, place, result, prefix) {
       </span>
       <span class="fact-type-label">Stamp description</span>
     </div>
-    <div class="fact-stamp-intro">${esc(result.stampIntro || 'You got this stamp by visiting ' + place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ') + '.')}</div>
+    <div class="fact-stamp-intro">${esc(result.stampIntro || 'You got this stamp by visiting ' + place.split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ') + '.')}</div>
     <div class="fact-text">${esc(result.fact)}</div>
     <div class="fact-foot">
       <span class="char-count">${result.fact.length} chars</span>
@@ -957,7 +961,7 @@ function handleCardClick(e) {
 
   if (action === 'copy-fact' && stored) {
     const fullText = stored.place
-      ? `${stored.stampIntro || ('You got this stamp by visiting ' + stored.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ') + '.')}\n\n${stored.fact}`
+      ? `${stored.stampIntro || ('You got this stamp by visiting ' + stored.place.split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ') + '.')}\n\n${stored.fact}`
       : stored.fact;
     copyToClipboard(fullText, btn);
   }
@@ -1335,7 +1339,7 @@ function exportBatchXLSX() {
     // Build rows as plain arrays — no style objects here to avoid SheetJS cellStyles bug
     const dataRows = results.map((r, i) => {
       const extras = seenHeaders.map(h => extraColsByResult[i][h] || '');
-      const capPlace = r.place.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      const capPlace = r.place.split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ');
       if (r.fact) {
         const fullDesc = `You got this stamp by visiting ${capPlace}.${CRLF}${CRLF}${r.fact}`;
         const srcs = (r.sources || []).map(s => s.label + ': ' + s.url);
@@ -1488,7 +1492,7 @@ function renderHistory() {
           <div class="db-chevron">▾</div>
         </div>
         <div class="db-item-body">
-          <div class="stamp-intro" style="font-size:11px;color:#aaa;margin-bottom:4px;">${esc(r.stampIntro || 'You got this stamp by visiting ' + r.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ') + '.')}</div>
+          <div class="stamp-intro" style="font-size:11px;color:#aaa;margin-bottom:4px;">${esc(r.stampIntro || 'You got this stamp by visiting ' + r.place.split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ') + '.')}</div>
           <div class="db-fact-text">${esc(r.fact||'')}</div>
           <div class="db-actions">
             ${verifyBtnHtml}
@@ -1523,7 +1527,7 @@ function exportBatchCSV() {
   const rows = [headerRow];
   batchResults.forEach((r, i) => {
     const extras = seenHeaders.map(h => extraColsByResult[i][h] || '');
-    const capPlace = (r.place||'').split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
+    const capPlace = (r.place||'').split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ');
     if (r.fact) {
       const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
       rows.push([r.place, r.country||'', r.sheet||'', ...extras, r.stampIntro||`You got this stamp by visiting ${capPlace}.`, r.fact, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
@@ -1558,7 +1562,7 @@ function exportBatchGSheets() {
   const rows = [headerRow];
   batchResults.forEach((r, i) => {
     const extras = seenHeaders.map(h => extraColsByResult[i][h] || '');
-    const capPlace = (r.place||'').split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
+    const capPlace = (r.place||'').split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ');
     if (r.fact) {
       const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
       rows.push([r.place, r.country||'', r.sheet||'', ...extras, r.stampIntro||`You got this stamp by visiting ${capPlace}.`, r.fact, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
@@ -1596,7 +1600,7 @@ function exportSessionCSV(sessionId, sessionDate) {
   const rows = [['Place', 'Country', 'Stamp Description', 'Char Count', 'Status', 'Source 1', 'Source 2', 'Source 3']];
   records.forEach(r => {
     const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
-    const capPlace = r.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
+    const capPlace = r.place.split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ');
     const fullDesc = r.fact ? `You got this stamp by visiting ${capPlace}.\n\n${r.fact}` : '';
     rows.push([r.place, r.country||'', fullDesc, (r.fact||'').length, r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
   });
@@ -1611,7 +1615,7 @@ function exportHistoryCSV() {
   const rows = [['Place', 'Country', 'Stamp Description', 'Char Count', 'Session', 'Date', 'Status', 'Source 1', 'Source 2', 'Source 3']];
   records.forEach(r => {
     const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
-    const capPlace = r.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
+    const capPlace = r.place.split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ');
     const fullDesc = r.fact ? `You got this stamp by visiting ${capPlace}.\n\n${r.fact}` : '';
     const sessionLabel = r.sessionId ? fmtDate(new Date(parseInt(r.sessionId.replace('session_',''))).toISOString()) : 'Legacy';
     rows.push([r.place, r.country||'', fullDesc, (r.fact||'').length, sessionLabel, fmtDate(r.date), r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
@@ -1635,7 +1639,7 @@ function exportHistoryXLSX() {
     const rows = [headers];
     group.records.forEach(r => {
       const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
-      const capPlace = r.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
+      const capPlace = r.place.split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ');
       rows.push([r.place, r.country||'', r.fact ? `You got this stamp by visiting ${capPlace}.` : '', r.fact||'', (r.fact||'').length, fmtDate(r.date), r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
     });
     const ws = XLSX.utils.aoa_to_sheet(rows);
