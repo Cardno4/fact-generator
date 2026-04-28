@@ -589,8 +589,17 @@ async function callClaude(prompt, maxTokens=800) {
 }
 
 // ── Step 1: Generate candidate fact ──────────────────────────────────────────
-async function generateCandidateFact(place) {
-  const raw = await callClaude(`You are a historical fact writer. Write exactly 1 specific historical fact about: "${place}"
+// correctionHint: if a previous attempt was contradicted by Wikipedia, this contains
+// the correct value (e.g. "opened in 1871") to guide the next generation
+async function generateCandidateFact(place, correctionHint = null) {
+  const correctionBlock = correctionHint
+    ? `
+
+IMPORTANT CORRECTION: A previous attempt was rejected because Wikipedia confirmed the correct answer is: "${correctionHint}". You MUST use this value in your fact — do not invent a different date or year.
+`
+    : '';
+
+  const raw = await callClaude(`You are a historical fact writer. Write exactly 1 specific historical fact about: "${place}"${correctionBlock}
 
 Rules (strict):
 - The fact must be between 150 and 250 characters long — count carefully
@@ -666,19 +675,11 @@ async function fetchWikipediaExtract(place) {
 }
 
 // ── Step 2b: Cross-check fact against real Wikipedia text + build source links ─
-async function autoVerifyFact(place, factObj) {
+// Returns verifyResult with extra fields: contradicted_by (if Wikipedia gives correct date),
+// wiki_too_short (if article is thin — triggers fallback mode)
+async function autoVerifyFact(place, factObj, wikiData) {
   const { fact, claimType } = factObj;
 
-  // Fetch real Wikipedia article — free, no Claude call needed
-  let wikiData;
-  try {
-    wikiData = await fetchWikipediaExtract(place);
-  } catch(e) {
-    throw new Error(`Wikipedia fetch failed: ${e.message}`);
-  }
-
-  // Ask Claude to cross-check the fact against the ACTUAL Wikipedia text
-  // This is grounded verification — Claude is reading real content, not recalling from memory
   const verifyRaw = await callClaude(`You are a fact-checker. You have been given the Wikipedia article extract for "${place}" and a historical fact to verify against it.
 
 WIKIPEDIA EXTRACT (authoritative source):
@@ -698,87 +699,122 @@ Your task:
 1. Identify the specific year or event being claimed in the fact
 2. Check whether the Wikipedia extract supports, contradicts, or is silent on this claim
 3. Extract the key claim being made (e.g. "built in 1173")
+4. If contradicted, extract the CORRECT year/fact from the Wikipedia extract
 
 Verdict rules:
 - "supported" = the Wikipedia extract explicitly mentions the same year/event → verified: true
-- "silent" = the extract doesn't mention it, BUT you are personally confident (high certainty from training data) the claim is accurate → verified: true, note your confidence
-- "silent_uncertain" = the extract doesn't mention it AND you are not confident → verified: false
-- "contradicted" = the extract gives a different year/fact → verified: false
-
-Important: "silent" is acceptable for well-known places where the intro section may not repeat every date.
-Only use "silent_uncertain" or "contradicted" to reject a fact.
+- "silent" = extract doesn't mention it BUT you are highly confident from training data → verified: true
+- "silent_uncertain" = extract doesn't mention it AND you are not confident → verified: false
+- "contradicted" = extract gives a different year/fact → verified: false
 
 Respond ONLY with valid JSON, no markdown:
 {
   "key_claim": "the specific claim e.g. 'constructed in 1173'",
-  "wiki_says": "what the Wikipedia extract says about this, or 'not mentioned in extract'",
+  "wiki_says": "what the Wikipedia extract says, or 'not mentioned in extract'",
   "verdict": "supported|silent|silent_uncertain|contradicted",
   "verified": true or false,
+  "correct_value": "if contradicted, the correct year/fact from Wikipedia — otherwise null",
   "note": "brief explanation"
 }`, 400);
 
   const verifyResult = JSON.parse(verifyRaw);
+  return verifyResult;
+}
 
-  if (!verifyResult.verified) {
-    throw new Error(`Wikipedia ${verifyResult.verdict}: ${verifyResult.note}`);
+// ── Step 2: Full verify pipeline — fetch Wikipedia + cross-check ─────────────
+async function verifyWithWikipedia(place, factObj) {
+  // Attempt to fetch Wikipedia article
+  let wikiData = null;
+  let wikiShort = false;
+  try {
+    wikiData = await fetchWikipediaExtract(place);
+    // Flag articles that are too thin to be reliable (< 200 chars after fetch)
+    if (wikiData.extract.length < 200) wikiShort = true;
+  } catch(e) {
+    wikiShort = true;
   }
 
-  // Build source links — Wikipedia link is now a real article URL, not just a search
-  const sources = [
+  // If Wikipedia article is too thin/missing, fall back to Claude confidence-only check
+  if (wikiShort || !wikiData) {
+    const fallbackRaw = await callClaude(`You are a strict fact-checker. Wikipedia has no usable article for "${place}".
+
+Fact to verify: "${factObj.fact}"
+
+Based solely on your training data, is this fact accurate?
+Be conservative — only verify:true if you are highly confident (9/10+).
+
+Respond ONLY with valid JSON:
+{"verified": true or false, "key_claim": "the core claim", "note": "explanation"}`, 300);
+    const fallback = JSON.parse(fallbackRaw);
+    if (!fallback.verified) throw new Error(`Unverifiable (no Wikipedia + low confidence): ${fallback.note}`);
+
+    // Build sources for fallback path
+    const sources = buildSources(place, fallback.key_claim, null);
+    return { sources, key_claim: fallback.key_claim, wiki_says: 'No Wikipedia article available', verifyNote: fallback.note, wikiTitle: null, wikiUrl: null };
+  }
+
+  // Cross-check against real Wikipedia text
+  const verifyResult = await autoVerifyFact(place, factObj, wikiData);
+
+  if (!verifyResult.verified) {
+    // If contradicted, attach the correct value so the retry can use it
+    const err = new Error(`Wikipedia ${verifyResult.verdict}: ${verifyResult.note}`);
+    err.correctValue = verifyResult.correct_value || null;
+    err.verdict = verifyResult.verdict;
+    throw err;
+  }
+
+  const sources = buildSources(place, verifyResult.key_claim, wikiData.url);
+  return { sources, key_claim: verifyResult.key_claim, wiki_says: verifyResult.wiki_says, verifyNote: verifyResult.note, wikiTitle: wikiData.title, wikiUrl: wikiData.url };
+}
+
+function buildSources(place, key_claim, wikiUrl) {
+  return [
     {
       label: 'Wikipedia',
-      q: verifyResult.key_claim,
+      q: key_claim,
       type: 'wikipedia',
-      url: wikiData.url,
-      iconBg: ICON_BG[0],
-      iconColor: ICON_COLOR[0],
-      iconLetter: 'W'
+      url: wikiUrl || `https://en.wikipedia.org/wiki/${encodeURIComponent(place.replace(/ /g,'_'))}`,
+      iconBg: ICON_BG[0], iconColor: ICON_COLOR[0], iconLetter: 'W'
     },
     {
       label: 'Encyclopaedia / Official',
-      q: `${place} ${verifyResult.key_claim} history`,
+      q: `${place} ${key_claim} history`,
       type: 'official',
-      url: `https://www.google.com/search?q=${encodeURIComponent(place + ' ' + verifyResult.key_claim + ' site:britannica.com OR site:history.com')}`,
-      iconBg: ICON_BG[1],
-      iconColor: ICON_COLOR[1],
-      iconLetter: 'O'
+      url: `https://www.google.com/search?q=${encodeURIComponent(place + ' ' + key_claim + ' site:britannica.com OR site:history.com')}`,
+      iconBg: ICON_BG[1], iconColor: ICON_COLOR[1], iconLetter: 'O'
     },
     {
       label: 'Reference & News',
-      q: `${place} ${verifyResult.key_claim}`,
+      q: `${place} ${key_claim}`,
       type: 'reference',
-      url: `https://www.google.com/search?q=${encodeURIComponent(place + ' ' + verifyResult.key_claim)}`,
-      iconBg: ICON_BG[2],
-      iconColor: ICON_COLOR[2],
-      iconLetter: 'N'
+      url: `https://www.google.com/search?q=${encodeURIComponent(place + ' ' + key_claim)}`,
+      iconBg: ICON_BG[2], iconColor: ICON_COLOR[2], iconLetter: 'N'
     }
   ];
-
-  return {
-    sources,
-    key_claim: verifyResult.key_claim,
-    wiki_says: verifyResult.wiki_says,
-    verifyNote: verifyResult.note,
-    wikiTitle: wikiData.title,
-    wikiUrl: wikiData.url
-  };
 }
 
-// ── Step 3: Full pipeline — generate + verify, with retries ──────────────────
+// ── Step 3: Full pipeline — generate + verify, with smart retries ────────────
 async function generateAndVerify(place, onStatusUpdate) {
   let lastError = '';
+  let correctionHint = null; // fed back into generation prompt when Wikipedia contradicts
+
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      onStatusUpdate(`Generating historical fact (attempt ${attempt}/${MAX_RETRIES})${attempt > 1 ? ' — retrying after failed verification…' : ''}`, attempt);
-      const factObj = await generateCandidateFact(place);
+      onStatusUpdate(`Generating historical fact (attempt ${attempt}/${MAX_RETRIES})${attempt > 1 ? ' — retrying with correction…' : ''}`, attempt);
+      const factObj = await generateCandidateFact(place, correctionHint);
 
       onStatusUpdate(`Checking against live Wikipedia article…`, attempt);
-      const verifyData = await autoVerifyFact(place, factObj);
+      const verifyData = await verifyWithWikipedia(place, factObj);
 
       // Passed — return everything
       return { fact: factObj.fact, claimType: factObj.claimType, ...verifyData };
     } catch(e) {
       lastError = e.message;
+      // If Wikipedia contradicted a specific value, pass it back to the next generation
+      if (e.verdict === 'contradicted' && e.correctValue) {
+        correctionHint = e.correctValue;
+      }
       if (attempt < MAX_RETRIES) await sleep(800);
     }
   }
