@@ -431,9 +431,9 @@ const ICON_LETTER = ['W', 'O', 'N'];
 // ── Fact store (prefix → {fact, sources}) ────────────────────────────────────
 const FACT_STORE = {};
 let factStoreCounter = 0;
-function storeFact(fact, sources, place) {
+function storeFact(fact, sources, place, stampIntro) {
   const id = ++factStoreCounter;
-  FACT_STORE[id] = { fact, sources, place };
+  FACT_STORE[id] = { fact, sources, place, stampIntro };
   return id;
 }
 function getStored(id) { return FACT_STORE[id] || null; }
@@ -454,6 +454,9 @@ let SESSION_KEY = '';
 let CURRENT_SESSION_ID = '';
 let batchResults = [];
 let sheetData = [];
+// Tracks fact categories used so far in a batch — prevents samey outputs
+// Keys: 'islands', 'coastline', 'borders', 'lakes', 'mountains', 'language', 'time_zones', 'biodiversity', 'other'
+let SESSION_USED_CATEGORIES = [];
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -567,10 +570,10 @@ function signOut() {
 // ── DB ────────────────────────────────────────────────────────────────────────
 function dbLoad() { try { return JSON.parse(localStorage.getItem(DB_KEY)||'[]'); } catch(e) { return []; } }
 function dbSave(r) { localStorage.setItem(DB_KEY, JSON.stringify(r)); updateBadge(); }
-function dbAddEntry(place, fact, sources, sessionId, country) {
+function dbAddEntry(place, fact, sources, sessionId, country, stampIntro) {
   const records = dbLoad();
   const existing = records.findIndex(r => r.place.toLowerCase() === place.toLowerCase() && r.sessionId === sessionId);
-  const entry = { id: existing>=0 ? records[existing].id : Date.now()+Math.random(), place, fact, sources, country: country||'', sessionId: sessionId||'', date: new Date().toISOString() };
+  const entry = { id: existing>=0 ? records[existing].id : Date.now()+Math.random(), place, fact, sources, country: country||'', stampIntro: stampIntro||'', sessionId: sessionId||'', date: new Date().toISOString() };
   if (existing>=0) records[existing] = entry; else records.unshift(entry);
   dbSave(records);
 }
@@ -694,7 +697,7 @@ Respond ONLY with valid JSON, no markdown:
 // ── Step 3: Generate description using confirmed Wikipedia facts ───────────────
 // Uses all of v29's rich prompt — tone, banned categories, em dash rule, etc.
 // but constrains factual claims to Wikipedia-confirmed data only
-async function generateCandidateFact(place, wikiFactList, lastError = '', allErrors = [], corrections = [], seenFacts = []) {
+async function generateCandidateFact(place, wikiFactList, lastError = '', allErrors = [], corrections = [], seenFacts = [], usedCategories = []) {
   const correctionSeed = corrections.length > 0
     ? `\n\nVERIFIED FACTUAL SEED: A previous attempt failed but the fact-checker confirmed this exact factual content is accurate:\n"${corrections[corrections.length - 1]}"\n\nThis seed IS your factual basis. Do not contradict it.`
     : '';
@@ -707,6 +710,22 @@ async function generateCandidateFact(place, wikiFactList, lastError = '', allErr
   const retryHint = allErrors.length > 0 && corrections.length === 0
     ? '\n\nIMPORTANT: your previous ' + allErrors.length + ' attempt(s) failed:\n' + errorHistory + '\n\nProduce something genuinely different. If a specific claim was rejected, do not try it again.'
     : '';
+
+  // Fix 1: Category diversity — tell Claude which categories are already saturated
+  const categoryBlock = usedCategories.length > 0
+    ? `\n\nDIVERSITY RULE — these fact categories have already been used multiple times in this batch. You MUST choose a different angle:\nOverused: ${usedCategories.join(', ')}\nIf the Wikipedia-confirmed facts only contain overused categories, pick the least-used one and approach it from a completely different angle than previous entries.`
+    : '';
+
+  // Fix 2: Country-level guidance — facts must be intrinsic to the place itself
+  const isCountry = wikiFactList && wikiFactList.some(f =>
+    f.source_quote && f.source_quote.length > 20
+  );
+  const countryGuidance = `\n\nCOUNTRY-LEVEL FACT RULE: The fact must be intrinsic to ${place} itself — not something that is equally true of neighbouring countries, shared rivers, or linguistic communities that exist elsewhere. Ask: "Could this fact be written about a different country?" If yes, choose a different fact.`;
+
+  // Fix 5: Article capitalisation for place names with "the"
+  const theCountries = ['united arab emirates', 'czech republic', 'philippines', 'united states', 'united kingdom', 'netherlands', 'bahamas', 'maldives', 'seychelles', 'comoros', 'solomon islands', 'marshall islands', 'cayman islands', 'faroe islands', 'turks and caicos'];
+  const placeNeedsThe = theCountries.some(c => place.toLowerCase().includes(c));
+  const stampIntroPlace = placeNeedsThe ? 'the ' + place : place;
 
   // Build the confirmed facts block — Claude can ONLY use these
   const factsBlock = wikiFactList && wikiFactList.length > 0
@@ -724,37 +743,45 @@ EM DASH RULE: The character (—) is strictly forbidden. Do not use it anywhere.
 
 TARGET LENGTH: 160 to 220 characters. Hard minimum: 150. Hard maximum: 240.
 
-Place: "${place}"${factsBlock}
+Place: "${place}"${factsBlock}${categoryBlock}${countryGuidance}
 
-GOOD EXAMPLES (factual, specific, no closing sentiment):
+GOOD EXAMPLES (factual, specific, intrinsic to the place):
 - "The Empire State Building was constructed in just 410 days, with crews working in shifts around the clock and finishing 45 days ahead of schedule during the height of the Great Depression." (188 chars)
 - "The Eiffel Tower was nearly demolished in 1909 when its original 20-year lease expired, and was saved only because its antenna had become essential for military radio communications." (181 chars)
 - "Machu Picchu sits at 2,430 metres above sea level and was never discovered by Spanish conquistadors, remaining unknown to the outside world until Hiram Bingham documented it in 1911." (182 chars)
+- "Austria is home to the world's oldest continuously operating zoo, the Tiergarten Schonbrunn in Vienna, which was founded in 1752 as an imperial menagerie by Emperor Francis I." (175 chars)
 
-BAD EXAMPLES (do not produce these):
+BAD EXAMPLES — do not produce facts like these:
 - "...and you can still feel the history underfoot today." (invented sentiment)
 - "...where the past and present meet." (generic filler)
+- Facts about rivers that flow through multiple countries (not intrinsic)
+- Facts about languages spoken in many countries (not intrinsic)
+- Facts about immigration or population demographics
+- Island counts, coastline lengths, or border counts if these categories are already overused in this batch
 
-BANNED FACT CATEGORIES:
+BANNED FACT CATEGORIES — these will be automatically rejected:
 - Politics, elections, voting systems or political parties
 - Laws, legislation, legal rulings or criminal justice policy
 - Drug policy, healthcare policy or social welfare programmes
 - Military spending, defence policy or treaties
 - Economic policy, tax systems or trade agreements
-- Immigration or citizenship rules
+- Immigration, citizenship, expat populations or demographic breakdown by nationality
 - Death, human remains, burials, cemeteries, executions, disasters or tragedies
 
-PREFERRED FACT CATEGORIES:
-- Geography: size, position, borders, terrain, coastline, elevation, rivers, islands
-- Natural world: climate records, wildlife, geology, ecosystems, natural phenomena
-- Architecture and engineering: construction records, materials, scale, structural facts
-- History of exploration, trade or empire: routes, discoveries, expeditions
-- Cultural output: language reach, UNESCO sites, ancient civilisations, historic firsts
+PREFERRED FACT CATEGORIES (in order of preference — use earlier categories before later ones):
+1. Architecture and engineering: construction records, founding stories, structural facts unique to this place
+2. History: a specific named historical event, founding moment, or discovery intrinsic to this place
+3. Cultural output: UNESCO designation, ancient civilisation, artistic or scientific first
+4. Natural world: a geological, ecological or climate record specific to this location
+5. Geography: size, elevation, terrain — only if the above categories are exhausted
 
-RULES FOR NUMBERS: Only use a specific number if it appears in the Wikipedia-confirmed facts list above. Maximum TWO numbers per description.${seenHint}${retryHint}${correctionSeed}
+RULES FOR NUMBERS: Only use a specific number if it appears in the Wikipedia-confirmed facts list above. Maximum TWO numbers per description.
+
+Also return a category label for the fact you chose from this fixed list:
+"founding_history" | "architecture_engineering" | "cultural_UNESCO" | "natural_world" | "geography_islands" | "geography_coastline" | "geography_borders" | "geography_lakes" | "geography_mountains" | "geography_other" | "record_claim"${seenHint}${retryHint}${correctionSeed}
 
 Respond ONLY with valid JSON, no markdown:
-{"fact":"the description here","country":"Full country name, e.g. United States of America"}`, 800);
+{"fact":"the description here","country":"Full country name, e.g. United States of America","stamp_intro":"You got this stamp by visiting ${stampIntroPlace}.","fact_category":"one label from the list above"}`, 800);
 
   const parsed = JSON.parse(raw);
 
@@ -766,12 +793,11 @@ Respond ONLY with valid JSON, no markdown:
     const dir = len > 240 ? `too long at ${len} chars, cut it down` : `too short at ${len} chars, expand it`;
     throw new Error(`Description length out of range: ${dir}. Target is 160 to 220 characters, minimum 150, maximum 240.`);
   }
-  return { fact: parsed.fact, country: parsed.country || '' };
+  return { fact: parsed.fact, country: parsed.country || '', stampIntro: parsed.stamp_intro || `You got this stamp by visiting ${stampIntroPlace}.`, factCategory: parsed.fact_category || 'geography_other' };
 }
 
-// ── Step 4: Verify — same v29 logic, now grounded against Wikipedia extract ───
+// ── Step 4: Verify — grounded against Wikipedia + banned category check ───────
 async function autoVerifyFact(place, fact, wikiData) {
-  // Build grounding context — pass Wikipedia text to verifier so it checks against real content
   const wikiContext = wikiData
     ? `\n\nWIKIPEDIA EXTRACT FOR REFERENCE:\n"${wikiData.extract.substring(0, 2000)}"\nUse this as your primary reference. If the extract contradicts the claim, classify as WRONG.`
     : '';
@@ -788,7 +814,7 @@ async function autoVerifyFact(place, fact, wikiData) {
     iconBg: ICON_BG[j] || '#f0f0f0', iconColor: ICON_COLOR[j] || '#555', iconLetter: ICON_LETTER[j] || '?'
   }));
 
-  const verifyRaw = await callClaude(`You are a fact-checker. Assess this specific verifiable claim:\n\nClaim: "${parsed.key_claim}"\nFull description: "${fact}"\nContext (place): "${place}"${wikiContext}\n\nClassify into one of three categories:\n1. CORRECT: factually accurate and well-documented\n2. AMBIGUOUS: core event is real but a minor detail (e.g. year varying by 1-2 across sources) is uncertain\n3. WRONG: clear factual error, unverifiable specific number, OR touches banned categories (death, remains, burials, disasters, tragedies)\n\nIf WRONG, provide a corrected version or suggest a different angle.\n\nRespond ONLY with valid JSON, no markdown:\n{"status": "CORRECT|AMBIGUOUS|WRONG", "note": "brief explanation", "correction": "corrected claim or empty string"}`, 400);
+  const verifyRaw = await callClaude(`You are a fact-checker. Assess this specific verifiable claim:\n\nClaim: "${parsed.key_claim}"\nFull description: "${fact}"\nContext (place): "${place}"${wikiContext}\n\nClassify into one of three categories:\n1. CORRECT: factually accurate and well-documented\n2. AMBIGUOUS: core event is real but a minor detail (e.g. year varying by 1-2 across sources) is uncertain\n3. WRONG: clear factual error, unverifiable specific number, OR touches any banned category\n\nBANNED CATEGORY CHECK — classify as WRONG if the description touches any of these, regardless of factual accuracy:\n- Immigration, expat populations, demographic breakdown by nationality or origin\n- Death, human remains, burials, cemeteries, executions, disasters or tragedies\n- Politics, elections, laws, military policy, economic policy\n- Facts that are not intrinsic to the named place (e.g. a river that flows through 11 countries is not a fact about one country)\n\nIf WRONG, provide a corrected version or suggest a different angle.\n\nRespond ONLY with valid JSON, no markdown:\n{"status": "CORRECT|AMBIGUOUS|WRONG", "note": "brief explanation", "correction": "corrected claim or empty string"}`, 400);
 
   const verifyResult = JSON.parse(verifyRaw);
   if (verifyResult.status === 'WRONG') {
@@ -824,15 +850,25 @@ async function generateAndVerify(place, onStatusUpdate, seenFacts = []) {
     // Wikipedia unavailable — proceed without it (fallback mode)
   }
 
+  // Build overused category list — categories used 2+ times this session
+  const categoryCounts = {};
+  SESSION_USED_CATEGORIES.forEach(c => { categoryCounts[c] = (categoryCounts[c] || 0) + 1; });
+  const overusedCategories = Object.entries(categoryCounts)
+    .filter(([, count]) => count >= 2)
+    .map(([cat]) => cat);
+
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       onStatusUpdate(`Generating stamp description (attempt ${attempt}/${MAX_RETRIES})${attempt > 1 ? ', retrying with different approach...' : ''}`, attempt);
-      const { fact, country } = await generateCandidateFact(place, wikiFacts, lastError, allErrors, corrections, seenFacts);
+      const { fact, country, stampIntro, factCategory } = await generateCandidateFact(place, wikiFacts, lastError, allErrors, corrections, seenFacts, overusedCategories);
 
       onStatusUpdate(`Verifying factual claim…`, attempt);
       const verifyData = await autoVerifyFact(place, fact, wikiData);
 
-      return { fact, country, wikiTitle: wikiData?.title || null, wikiUrl: wikiData?.url || null, ...verifyData };
+      // Record category used so future entries in this batch avoid the same angle
+      if (factCategory) SESSION_USED_CATEGORIES.push(factCategory);
+
+      return { fact, country, stampIntro, wikiTitle: wikiData?.title || null, wikiUrl: wikiData?.url || null, ...verifyData };
     } catch(e) {
       lastError = e.message;
       allErrors.push(e.message);
@@ -846,7 +882,7 @@ async function generateAndVerify(place, onStatusUpdate, seenFacts = []) {
 
 // ── Render a verified fact card ───────────────────────────────────────────────
 function renderFactCard(container, place, result, prefix) {
-  const storeId = storeFact(result.fact, result.sources, place);
+  const storeId = storeFact(result.fact, result.sources, place, result.stampIntro);
 
   const card = document.createElement('div');
   card.className = 'fact-card';
@@ -872,7 +908,7 @@ function renderFactCard(container, place, result, prefix) {
       </span>
       <span class="fact-type-label">Stamp description</span>
     </div>
-    <div class="fact-stamp-intro">You got this stamp by visiting ${esc(place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' '))}.</div>
+    <div class="fact-stamp-intro">${esc(result.stampIntro || 'You got this stamp by visiting ' + place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ') + '.')}</div>
     <div class="fact-text">${esc(result.fact)}</div>
     <div class="fact-foot">
       <span class="char-count">${result.fact.length} chars</span>
@@ -917,7 +953,7 @@ function handleCardClick(e) {
 
   if (action === 'copy-fact' && stored) {
     const fullText = stored.place
-      ? `You got this stamp by visiting ${stored.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ')}.\n\n${stored.fact}`
+      ? `${stored.stampIntro || ('You got this stamp by visiting ' + stored.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ') + '.')}\n\n${stored.fact}`
       : stored.fact;
     copyToClipboard(fullText, btn);
   }
@@ -993,7 +1029,7 @@ async function generateItemAt(i, place, group) {
     renderFactCard(factDiv, place, result, `b${i}`);
     const loadingDone = document.getElementById(`group-loading-${i}`);
     if (loadingDone) loadingDone.replaceWith(factDiv.firstChild);
-    dbAddEntry(place, result.fact, result.sources, CURRENT_SESSION_ID, result.country);
+    dbAddEntry(place, result.fact, result.sources, CURRENT_SESSION_ID, result.country, result.stampIntro);
     recordSeenFact(place, result.fact);
     updateBadge();
 
@@ -1049,7 +1085,7 @@ async function generateSingle() {
     }, getSeenFacts(q));
 
     renderFactCard(results, q, result, 's');
-    dbAddEntry(q, result.fact, result.sources, CURRENT_SESSION_ID, result.country);
+    dbAddEntry(q, result.fact, result.sources, CURRENT_SESSION_ID, result.country, result.stampIntro);
     recordSeenFact(q, result.fact);
 
   } catch(e) {
@@ -1207,6 +1243,7 @@ async function generateBatch() {
 
   // New session ID shared by every entry in this batch run
   CURRENT_SESSION_ID = 'session_' + Date.now();
+  SESSION_USED_CATEGORIES = []; // reset diversity tracker for new batch
 
   const btn = document.getElementById('btn-batch');
   btn.disabled = true; btn.textContent = 'Generating…';
@@ -1447,6 +1484,7 @@ function renderHistory() {
           <div class="db-chevron">▾</div>
         </div>
         <div class="db-item-body">
+          <div class="stamp-intro" style="font-size:11px;color:#aaa;margin-bottom:4px;">${esc(r.stampIntro || 'You got this stamp by visiting ' + r.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ') + '.')}</div>
           <div class="db-fact-text">${esc(r.fact||'')}</div>
           <div class="db-actions">
             ${verifyBtnHtml}
@@ -1484,7 +1522,7 @@ function exportBatchCSV() {
     const capPlace = (r.place||'').split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
     if (r.fact) {
       const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
-      rows.push([r.place, r.country||'', r.sheet||'', ...extras, `You got this stamp by visiting ${capPlace}.`, r.fact, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
+      rows.push([r.place, r.country||'', r.sheet||'', ...extras, r.stampIntro||`You got this stamp by visiting ${capPlace}.`, r.fact, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
     } else {
       rows.push([r.place, r.country||'', r.sheet||'', ...extras, '', '', 0, 'Failed', r.error||'Could not produce a verified description after 4 attempts', '', '', '']);
     }
@@ -1519,7 +1557,7 @@ function exportBatchGSheets() {
     const capPlace = (r.place||'').split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
     if (r.fact) {
       const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
-      rows.push([r.place, r.country||'', r.sheet||'', ...extras, `You got this stamp by visiting ${capPlace}.`, r.fact, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
+      rows.push([r.place, r.country||'', r.sheet||'', ...extras, r.stampIntro||`You got this stamp by visiting ${capPlace}.`, r.fact, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
     } else {
       rows.push([r.place, r.country||'', r.sheet||'', ...extras, '', '', 0, 'Failed', r.error||'Could not produce a verified description after 4 attempts', '', '', '']);
     }
