@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Fact Generator v38</title>
+  <title>Fact Generator v39</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -292,7 +292,7 @@
 <div class="container" id="app-screen">
   <div class="topbar">
     <div class="topbar-left">
-      <h1>Fact Generator <span style="font-size:13px;font-weight:400;color:#bbb;letter-spacing:0.02em">v38</span></h1>
+      <h1>Fact Generator <span style="font-size:13px;font-weight:400;color:#bbb;letter-spacing:0.02em">v39</span></h1>
       <p>One verified stamp description per place — shown with stamp framing line, factual claim confirmed before display</p>
     </div>
     <div class="topbar-right">
@@ -816,17 +816,21 @@ LANGUAGE THAT IS STRICTLY FORBIDDEN — do not use any of these phrases under an
 - "among the world's most / least"
 - Any ordinal ranking: "fourth-largest", "second-most", "third-highest" etc.
 - "the only country / city / place that..."  — unless you are 100% certain and it is in the Wikipedia-confirmed facts list
-- "world record", "world's first" — unless explicitly in the Wikipedia-confirmed facts list
-If you find yourself wanting to use any of these phrases, choose a different fact entirely.
+- "world record" — unless explicitly in the Wikipedia-confirmed facts list
+- "world's first" — ALLOWED only if it appears verbatim in the Wikipedia-confirmed facts list above. If it is not in the list, do not use it.
+If you find yourself wanting to use comparative superlative phrases not in the confirmed facts list, choose a different fact entirely.
 
 BANNED FACT CATEGORIES — these will be automatically rejected:
-- Politics, elections, voting systems or political parties
-- Laws, legislation, legal rulings or criminal justice policy
+- Current politics, elections, voting systems or political parties
+- Current laws, legislation, legal rulings or criminal justice policy
 - Drug policy, healthcare policy or social welfare programmes
 - Military spending, defence policy or treaties
 - Economic policy, tax systems or trade agreements
 - Immigration, citizenship, expat populations or demographic breakdown by nationality
 - Death, human remains, burials, cemeteries, executions, disasters or tragedies
+- Current governance structures: how a country is currently governed, its federal system, parliamentary arrangements, or constitutional setup
+
+NOTE: Named historical events involving political change ARE allowed — revolutions, conquests, declarations of independence, unifications — provided they have a specific year and are in the Wikipedia-confirmed facts list. The test is: does this describe a specific moment in history (allowed) or how the place is governed today (banned)?
 
 PREFERRED FACT CATEGORIES (in order of preference — use earlier categories before later ones):
 1. Architecture and engineering: construction records, founding stories, structural facts unique to this place
@@ -874,7 +878,7 @@ async function autoVerifyFact(place, fact, wikiData) {
     iconBg: ICON_BG[j] || '#f0f0f0', iconColor: ICON_COLOR[j] || '#555', iconLetter: ICON_LETTER[j] || '?'
   }));
 
-  const verifyRaw = await callClaude(`You are a fact-checker. Assess this specific verifiable claim:\n\nClaim: "${parsed.key_claim}"\nFull description: "${fact}"\nContext (place): "${place}"${wikiContext}\n\nClassify into one of three categories:\n1. CORRECT: factually accurate and well-documented\n2. AMBIGUOUS: core event is real but a minor detail (e.g. year varying by 1-2 across sources) is uncertain\n3. WRONG: clear factual error, unverifiable specific number, soft record claim, OR touches any banned category\n\nSOFT RECORD CHECK — apply this mechanically before anything else:\nScan the description for these exact phrases or patterns:\n- "more than any other" → WRONG unless the Wikipedia extract contains this verbatim\n- "one of the largest / smallest / oldest / most / fewest / highest / lowest" → WRONG unless the Wikipedia extract contains this verbatim\n- "among the world's" → WRONG unless the Wikipedia extract contains this verbatim\n- Any ordinal ranking: "fourth-largest", "second-most", "third-highest" → WRONG unless Wikipedia extract states it verbatim\n- "world record" → WRONG unless Wikipedia extract names it explicitly\nDo not use your own knowledge to validate these claims. If the phrase is in the description but NOT verbatim in the Wikipedia extract, it is WRONG. No exceptions.\n\nBANNED CATEGORY CHECK — classify as WRONG if the description touches any of these, regardless of factual accuracy:\n- Immigration, expat populations, demographic breakdown by nationality or origin\n- Death, human remains, burials, cemeteries, executions, disasters or tragedies\n- Politics, elections, laws, military policy, economic policy\n- Constitutional structure, governance systems, parliamentary arrangements, federal/state autonomy\n- Facts about education policy, policing, legal systems or public administration\n- Facts that are not intrinsic to the named place (e.g. a river that flows through 11 countries is not a fact about one country)\n\nIf WRONG, provide a corrected version or suggest a different angle.\n\nRespond ONLY with valid JSON, no markdown:\n{"status": "CORRECT|AMBIGUOUS|WRONG", "note": "brief explanation", "correction": "corrected claim or empty string"}`, 400);
+  const verifyRaw = await callClaude(`You are a fact-checker. Assess this specific verifiable claim:\n\nClaim: "${parsed.key_claim}"\nFull description: "${fact}"\nContext (place): "${place}"${wikiContext}\n\nClassify into one of three categories:\n1. CORRECT: factually accurate and well-documented\n2. AMBIGUOUS: core event is real but a minor detail (e.g. year varying by 1-2 across sources) is uncertain\n3. WRONG: clear factual error, unverifiable specific number, soft record claim, OR touches any banned category\n\nSOFT RECORD CHECK — apply this mechanically before anything else:\nScan the description for these exact phrases or patterns:\n- "more than any other" → WRONG unless the Wikipedia extract contains this verbatim\n- "one of the largest / smallest / oldest / most / fewest / highest / lowest" → WRONG unless the Wikipedia extract contains this verbatim\n- "among the world's" → WRONG unless the Wikipedia extract contains this verbatim\n- Any ordinal ranking: "fourth-largest", "second-most", "third-highest" → WRONG unless Wikipedia extract states it verbatim\n- "world record" → WRONG unless Wikipedia extract names it explicitly\nDo not use your own knowledge to validate these claims. If the phrase is in the description but NOT verbatim in the Wikipedia extract, it is WRONG. No exceptions.\n\nBANNED CATEGORY CHECK — classify as WRONG if the description touches any of these, regardless of factual accuracy:\n- Immigration, expat populations, demographic breakdown by nationality or origin\n- Death, human remains, burials, cemeteries, executions, disasters or tragedies\n- Politics, elections, current laws, current military policy, current economic policy\n- Current constitutional structure, current governance systems, current parliamentary arrangements, federal/state autonomy as it exists today\n- Facts about current education policy, policing, legal systems or public administration\n- Facts that are not intrinsic to the named place (e.g. a river that flows through 11 countries is not a fact about one country)\n\nCRITICAL DISTINCTION — do NOT ban these, they are historical events not governance facts:\n- Named historical revolutions, conquests, declarations or unifications with a specific year (e.g. French Revolution 1789, Fall of Constantinople 1453, Declaration of Independence 1776)\n- These are category C historical events and are explicitly allowed\n- Only ban facts that describe HOW a country is currently governed, not facts about a specific historical moment that changed it\n\nIf WRONG, provide a corrected version or suggest a different angle.\n\nRespond ONLY with valid JSON, no markdown:\n{"status": "CORRECT|AMBIGUOUS|WRONG", "note": "brief explanation", "correction": "corrected claim or empty string"}`, 400);
 
   const verifyResult = JSON.parse(verifyRaw);
   if (verifyResult.status === 'WRONG') {
