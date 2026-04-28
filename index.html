@@ -624,31 +624,44 @@ Respond ONLY with valid JSON, no markdown:
 
 // ── Step 2a: Fetch real Wikipedia article text (free, no auth) ───────────────
 async function fetchWikipediaExtract(place) {
-  // Try exact title first, then a search fallback
-  const titleSlug = encodeURIComponent(place.replace(/ /g, '_'));
-  const summaryUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${titleSlug}`;
+  // Always search first — more robust than exact title matching for ambiguous
+  // names like "Prospect Park", "Williamsburg (Brooklyn)", "Dumbo (Brooklyn waterfront)"
+  const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(place)}&srlimit=3&format=json&origin=*`;
+  const searchRes = await fetch(searchUrl);
+  if (!searchRes.ok) throw new Error(`Wikipedia search failed for "${place}"`);
+  const searchData = await searchRes.json();
+  const results = searchData?.query?.search || [];
+  if (!results.length) throw new Error(`No Wikipedia article found for "${place}"`);
 
-  let res = await fetch(summaryUrl);
-  if (!res.ok) {
-    // Fallback: use the Wikipedia search API to find the best matching article
-    const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(place)}&srlimit=1&format=json&origin=*`;
-    const searchRes = await fetch(searchUrl);
-    if (!searchRes.ok) throw new Error(`Wikipedia search failed for "${place}"`);
-    const searchData = await searchRes.json();
-    const topResult = searchData?.query?.search?.[0]?.title;
-    if (!topResult) throw new Error(`No Wikipedia article found for "${place}"`);
-    const fallbackSlug = encodeURIComponent(topResult.replace(/ /g, '_'));
-    res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${fallbackSlug}`);
-    if (!res.ok) throw new Error(`Wikipedia article fetch failed for "${place}"`);
+  // Pick best match — prefer titles that contain or closely match the place name
+  const placeLower = place.toLowerCase().replace(/[^a-z0-9]/g, '');
+  let bestTitle = results[0].title;
+  for (const r of results) {
+    const rLower = r.title.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (rLower === placeLower || rLower.includes(placeLower) || placeLower.includes(rLower)) {
+      bestTitle = r.title; break;
+    }
   }
 
-  const data = await res.json();
-  if (!data.extract || data.extract.length < 50) throw new Error(`Wikipedia article too short or missing for "${place}"`);
+  // Fetch full intro section via extracts API — much more content than REST summary
+  // exintro=true returns the entire intro section (not just the first paragraph)
+  const titleEncoded = encodeURIComponent(bestTitle);
+  const extractUrl = `https://en.wikipedia.org/w/api.php?action=query&titles=${titleEncoded}&prop=extracts&exintro=true&explaintext=true&format=json&origin=*`;
+  const extractRes = await fetch(extractUrl);
+  if (!extractRes.ok) throw new Error(`Wikipedia extract fetch failed for "${bestTitle}"`);
+  const extractData = await extractRes.json();
+
+  const pages = extractData?.query?.pages || {};
+  const page = Object.values(pages)[0];
+  if (!page || page.missing !== undefined) throw new Error(`Wikipedia page missing for "${bestTitle}"`);
+
+  const extract = page.extract || '';
+  if (extract.length < 50) throw new Error(`Wikipedia article too short for "${bestTitle}"`);
 
   return {
-    extract: data.extract,
-    title: data.title,
-    url: data.content_urls?.desktop?.page || `https://en.wikipedia.org/wiki/${titleSlug}`
+    extract: extract.substring(0, 3000), // full intro — typically 300–1500 chars, covers founding dates well
+    title: page.title,
+    url: `https://en.wikipedia.org/wiki/${encodeURIComponent((page.title || bestTitle).replace(/ /g, '_'))}`
   };
 }
 
@@ -666,10 +679,10 @@ async function autoVerifyFact(place, factObj) {
 
   // Ask Claude to cross-check the fact against the ACTUAL Wikipedia text
   // This is grounded verification — Claude is reading real content, not recalling from memory
-  const verifyRaw = await callClaude(`You are a strict fact-checker. You have been given the Wikipedia article extract for "${place}" and a historical fact to verify against it.
+  const verifyRaw = await callClaude(`You are a fact-checker. You have been given the Wikipedia article extract for "${place}" and a historical fact to verify against it.
 
 WIKIPEDIA EXTRACT (authoritative source):
-"${wikiData.extract.substring(0, 1200)}"
+"${wikiData.extract.substring(0, 3000)}"
 
 FACT TO VERIFY:
 "${fact}"
@@ -686,17 +699,20 @@ Your task:
 2. Check whether the Wikipedia extract supports, contradicts, or is silent on this claim
 3. Extract the key claim being made (e.g. "built in 1173")
 
-Rules:
-- "supported" = the Wikipedia extract explicitly mentions the same year/event
-- "silent" = the extract doesn't mention it either way (treat as UNVERIFIED, not verified)
-- "contradicted" = the extract gives a different year/fact
+Verdict rules:
+- "supported" = the Wikipedia extract explicitly mentions the same year/event → verified: true
+- "silent" = the extract doesn't mention it, BUT you are personally confident (high certainty from training data) the claim is accurate → verified: true, note your confidence
+- "silent_uncertain" = the extract doesn't mention it AND you are not confident → verified: false
+- "contradicted" = the extract gives a different year/fact → verified: false
 
-Only return verified:true if the extract EXPLICITLY supports the claim.
+Important: "silent" is acceptable for well-known places where the intro section may not repeat every date.
+Only use "silent_uncertain" or "contradicted" to reject a fact.
+
 Respond ONLY with valid JSON, no markdown:
 {
   "key_claim": "the specific claim e.g. 'constructed in 1173'",
-  "wiki_says": "what the Wikipedia extract says about this, verbatim or 'not mentioned'",
-  "verdict": "supported|silent|contradicted",
+  "wiki_says": "what the Wikipedia extract says about this, or 'not mentioned in extract'",
+  "verdict": "supported|silent|silent_uncertain|contradicted",
   "verified": true or false,
   "note": "brief explanation"
 }`, 400);
