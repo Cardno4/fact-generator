@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Fact Generator v36</title>
+  <title>Fact Generator v37</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -292,7 +292,7 @@
 <div class="container" id="app-screen">
   <div class="topbar">
     <div class="topbar-left">
-      <h1>Fact Generator <span style="font-size:13px;font-weight:400;color:#bbb;letter-spacing:0.02em">v36</span></h1>
+      <h1>Fact Generator <span style="font-size:13px;font-weight:400;color:#bbb;letter-spacing:0.02em">v37</span></h1>
       <p>One verified stamp description per place — shown with stamp framing line, factual claim confirmed before display</p>
     </div>
     <div class="topbar-right">
@@ -822,7 +822,7 @@ async function autoVerifyFact(place, fact, wikiData) {
     iconBg: ICON_BG[j] || '#f0f0f0', iconColor: ICON_COLOR[j] || '#555', iconLetter: ICON_LETTER[j] || '?'
   }));
 
-  const verifyRaw = await callClaude(`You are a fact-checker. Assess this specific verifiable claim:\n\nClaim: "${parsed.key_claim}"\nFull description: "${fact}"\nContext (place): "${place}"${wikiContext}\n\nClassify into one of three categories:\n1. CORRECT: factually accurate and well-documented\n2. AMBIGUOUS: core event is real but a minor detail (e.g. year varying by 1-2 across sources) is uncertain\n3. WRONG: clear factual error, unverifiable specific number, soft record claim, OR touches any banned category\n\nSOFT RECORD CHECK — classify as WRONG if the description contains any of the following without an explicit Wikipedia source quote to back it up:\n- "one of the largest / smallest / oldest / most / fewest / highest / lowest"\n- "more than any other country / city / region"\n- "among the world's most / least"\n- Any ranking claim (e.g. "fourth-largest", "second-most")\n- Any claim using "world record" without a specific named record holder\nIf the Wikipedia extract explicitly states the record, it may be CORRECT. If it is hedged or implied, it is WRONG.\n\nBANNED CATEGORY CHECK — classify as WRONG if the description touches any of these, regardless of factual accuracy:\n- Immigration, expat populations, demographic breakdown by nationality or origin\n- Death, human remains, burials, cemeteries, executions, disasters or tragedies\n- Politics, elections, laws, military policy, economic policy\n- Facts that are not intrinsic to the named place (e.g. a river that flows through 11 countries is not a fact about one country)\n\nIf WRONG, provide a corrected version or suggest a different angle.\n\nRespond ONLY with valid JSON, no markdown:\n{"status": "CORRECT|AMBIGUOUS|WRONG", "note": "brief explanation", "correction": "corrected claim or empty string"}`, 400);
+  const verifyRaw = await callClaude(`You are a fact-checker. Assess this specific verifiable claim:\n\nClaim: "${parsed.key_claim}"\nFull description: "${fact}"\nContext (place): "${place}"${wikiContext}\n\nClassify into one of three categories:\n1. CORRECT: factually accurate and well-documented\n2. AMBIGUOUS: core event is real but a minor detail (e.g. year varying by 1-2 across sources) is uncertain\n3. WRONG: clear factual error, unverifiable specific number, soft record claim, OR touches any banned category\n\nSOFT RECORD CHECK — apply this mechanically before anything else:\nScan the description for these exact phrases or patterns:\n- "more than any other" → WRONG unless the Wikipedia extract contains this verbatim\n- "one of the largest / smallest / oldest / most / fewest / highest / lowest" → WRONG unless the Wikipedia extract contains this verbatim\n- "among the world's" → WRONG unless the Wikipedia extract contains this verbatim\n- Any ordinal ranking: "fourth-largest", "second-most", "third-highest" → WRONG unless Wikipedia extract states it verbatim\n- "world record" → WRONG unless Wikipedia extract names it explicitly\nDo not use your own knowledge to validate these claims. If the phrase is in the description but NOT verbatim in the Wikipedia extract, it is WRONG. No exceptions.\n\nBANNED CATEGORY CHECK — classify as WRONG if the description touches any of these, regardless of factual accuracy:\n- Immigration, expat populations, demographic breakdown by nationality or origin\n- Death, human remains, burials, cemeteries, executions, disasters or tragedies\n- Politics, elections, laws, military policy, economic policy\n- Constitutional structure, governance systems, parliamentary arrangements, federal/state autonomy\n- Facts about education policy, policing, legal systems or public administration\n- Facts that are not intrinsic to the named place (e.g. a river that flows through 11 countries is not a fact about one country)\n\nIf WRONG, provide a corrected version or suggest a different angle.\n\nRespond ONLY with valid JSON, no markdown:\n{"status": "CORRECT|AMBIGUOUS|WRONG", "note": "brief explanation", "correction": "corrected claim or empty string"}`, 400);
 
   const verifyResult = JSON.parse(verifyRaw);
   if (verifyResult.status === 'WRONG') {
@@ -1339,9 +1339,9 @@ function exportBatchXLSX() {
     // Build rows as plain arrays — no style objects here to avoid SheetJS cellStyles bug
     const dataRows = results.map((r, i) => {
       const extras = seenHeaders.map(h => extraColsByResult[i][h] || '');
-      const capPlace = r.place.split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ');
+      const stampLine = r.stampIntro || `You got this stamp by visiting ${r.place.split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ')}.`;
       if (r.fact) {
-        const fullDesc = `You got this stamp by visiting ${capPlace}.${CRLF}${CRLF}${r.fact}`;
+        const fullDesc = `${stampLine}${CRLF}${CRLF}${r.fact}`;
         const srcs = (r.sources || []).map(s => s.label + ': ' + s.url);
         return [r.place, r.country || '', ...extras, fullDesc, r.fact.length, 'Verified', '', srcs[0] || '', srcs[1] || '', srcs[2] || ''];
       } else {
@@ -1527,10 +1527,10 @@ function exportBatchCSV() {
   const rows = [headerRow];
   batchResults.forEach((r, i) => {
     const extras = seenHeaders.map(h => extraColsByResult[i][h] || '');
-    const capPlace = (r.place||'').split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ');
+    const capPlaceFallback = (r.place||'').split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ');
     if (r.fact) {
       const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
-      rows.push([r.place, r.country||'', r.sheet||'', ...extras, r.stampIntro||`You got this stamp by visiting ${capPlace}.`, r.fact, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
+      rows.push([r.place, r.country||'', r.sheet||'', ...extras, r.stampIntro||`You got this stamp by visiting ${capPlaceFallback}.`, r.fact, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
     } else {
       rows.push([r.place, r.country||'', r.sheet||'', ...extras, '', '', 0, 'Failed', r.error||'Could not produce a verified description after 4 attempts', '', '', '']);
     }
@@ -1562,10 +1562,10 @@ function exportBatchGSheets() {
   const rows = [headerRow];
   batchResults.forEach((r, i) => {
     const extras = seenHeaders.map(h => extraColsByResult[i][h] || '');
-    const capPlace = (r.place||'').split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ');
+    const capPlaceFallback = (r.place||'').split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ');
     if (r.fact) {
       const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
-      rows.push([r.place, r.country||'', r.sheet||'', ...extras, r.stampIntro||`You got this stamp by visiting ${capPlace}.`, r.fact, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
+      rows.push([r.place, r.country||'', r.sheet||'', ...extras, r.stampIntro||`You got this stamp by visiting ${capPlaceFallback}.`, r.fact, r.fact.length, 'Verified', '', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
     } else {
       rows.push([r.place, r.country||'', r.sheet||'', ...extras, '', '', 0, 'Failed', r.error||'Could not produce a verified description after 4 attempts', '', '', '']);
     }
@@ -1601,7 +1601,7 @@ function exportSessionCSV(sessionId, sessionDate) {
   records.forEach(r => {
     const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
     const capPlace = r.place.split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ');
-    const fullDesc = r.fact ? `You got this stamp by visiting ${capPlace}.\n\n${r.fact}` : '';
+    const fullDesc = r.fact ? `${r.stampIntro || 'You got this stamp by visiting ' + r.place.split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ') + '.'}\n\n${r.fact}` : '';
     rows.push([r.place, r.country||'', fullDesc, (r.fact||'').length, r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
   });
   // Label filename with session datetime
@@ -1616,7 +1616,7 @@ function exportHistoryCSV() {
   records.forEach(r => {
     const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
     const capPlace = r.place.split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ');
-    const fullDesc = r.fact ? `You got this stamp by visiting ${capPlace}.\n\n${r.fact}` : '';
+    const fullDesc = r.fact ? `${r.stampIntro || 'You got this stamp by visiting ' + r.place.split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ') + '.'}\n\n${r.fact}` : '';
     const sessionLabel = r.sessionId ? fmtDate(new Date(parseInt(r.sessionId.replace('session_',''))).toISOString()) : 'Legacy';
     rows.push([r.place, r.country||'', fullDesc, (r.fact||'').length, sessionLabel, fmtDate(r.date), r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
   });
@@ -1640,7 +1640,7 @@ function exportHistoryXLSX() {
     group.records.forEach(r => {
       const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
       const capPlace = r.place.split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ');
-      rows.push([r.place, r.country||'', r.fact ? `You got this stamp by visiting ${capPlace}.` : '', r.fact||'', (r.fact||'').length, fmtDate(r.date), r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
+      rows.push([r.place, r.country||'', r.fact ? (r.stampIntro || `You got this stamp by visiting ${r.place.split(' ').map((w,i)=>{const lo=w.toLowerCase();return(i>0&&['of','and','the','a','an','in','on','at','to','for','by','with','de','du','di','van','von'].includes(lo))?lo:lo.charAt(0).toUpperCase()+lo.slice(1);}).join(' ')}.`) : '', r.fact||'', (r.fact||'').length, fmtDate(r.date), r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
     });
     const ws = XLSX.utils.aoa_to_sheet(rows);
     ws['!cols'] = [{wch:28},{wch:22},{wch:38},{wch:70},{wch:8},{wch:18},{wch:10},{wch:45},{wch:45},{wch:45}];
