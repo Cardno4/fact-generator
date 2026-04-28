@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Fact Generator v34</title>
+  <title>Fact Generator v35</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -292,7 +292,7 @@
 <div class="container" id="app-screen">
   <div class="topbar">
     <div class="topbar-left">
-      <h1>Fact Generator <span style="font-size:13px;font-weight:400;color:#bbb;letter-spacing:0.02em">v34</span></h1>
+      <h1>Fact Generator <span style="font-size:13px;font-weight:400;color:#bbb;letter-spacing:0.02em">v35</span></h1>
       <p>One verified stamp description per place — shown with stamp framing line, factual claim confirmed before display</p>
     </div>
     <div class="topbar-right">
@@ -669,15 +669,19 @@ async function extractWikiFacts(place, wikiData) {
 WIKIPEDIA EXTRACT:
 "${wikiData.extract}"
 
-Extract facts in these categories only — omit any not explicitly present in the extract:
+Extract facts in these categories — omit any not explicitly present in the extract.
+Extract ALL categories present, ordered by priority (A first, geography last):
   A) Founding or construction year — exact year the place was founded/built/opened
   B) UNESCO World Heritage designation year
-  C) Named historical event with a confirmed year
-  D) A well-documented geographic, engineering, or cultural record (size, elevation, age, etc.)
+  C) Named historical event with a confirmed year — specific event + year explicitly stated
+  D) Architecture or engineering record — construction detail, structural fact, scale unique to this place
+  E) Geographic record — size, elevation, island count, coastline, borders (lowest priority — only include if A-D are absent)
 
 Rules:
 - Only extract facts EXPLICITLY stated in the extract — do not infer or invent
+- Do NOT extract facts about shared features (rivers through multiple countries, languages spoken elsewhere)
 - Include the exact quote from the extract that supports each fact
+- Mark geographic (type E) facts as lower priority so they are used only as a last resort
 
 Respond ONLY with valid JSON, no markdown:
 {
