@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Fact Generator v40</title>
+  <title>Fact Generator v41</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -292,7 +292,7 @@
 <div class="container" id="app-screen">
   <div class="topbar">
     <div class="topbar-left">
-      <h1>Fact Generator <span style="font-size:13px;font-weight:400;color:#bbb;letter-spacing:0.02em">v40</span></h1>
+      <h1>Fact Generator <span style="font-size:13px;font-weight:400;color:#bbb;letter-spacing:0.02em">v41</span></h1>
       <p>One verified stamp description per place — shown with stamp framing line, factual claim confirmed before display</p>
     </div>
     <div class="topbar-right">
@@ -771,6 +771,13 @@ BANNED FACT CATEGORIES — these will be automatically rejected:
 - Economic policy, tax systems or trade agreements
 - Immigration, citizenship, expat populations or demographic breakdown by nationality
 - Death, human remains, burials, cemeteries, executions, disasters or tragedies
+- Wars, civil wars, armed conflicts, insurgencies or military invasions — even when framed with historical dates
+- Territorial disputes, colonial grievances, separatist movements or ongoing political conflicts
+- Constitutional changes, transitions of government, independence movements or changes in head of state
+- Any fact that ends with or implies ongoing conflict, dispute or suffering ("continues today", "remains contested", "still unresolved")
+- Famines, epidemics, genocides, massacres or humanitarian crises
+
+TRAVELLER TONE TEST — before finalising your fact, ask: "Would a visitor feel good reading this on a collectible stamp marking their trip?" If the answer is no, choose a different fact. The fact should make the reader feel informed and glad they visited — not uncomfortable, sad or politically aware.
 
 PREFERRED FACT CATEGORIES (in order of preference — use earlier categories before later ones):
 1. Architecture and engineering: construction records, founding stories, structural facts unique to this place
@@ -818,7 +825,7 @@ async function autoVerifyFact(place, fact, wikiData) {
     iconBg: ICON_BG[j] || '#f0f0f0', iconColor: ICON_COLOR[j] || '#555', iconLetter: ICON_LETTER[j] || '?'
   }));
 
-  const verifyRaw = await callClaude(`You are a fact-checker. Assess this specific verifiable claim:\n\nClaim: "${parsed.key_claim}"\nFull description: "${fact}"\nContext (place): "${place}"${wikiContext}\n\nClassify into one of three categories:\n1. CORRECT: factually accurate and well-documented\n2. AMBIGUOUS: core event is real but a minor detail (e.g. year varying by 1-2 across sources) is uncertain\n3. WRONG: clear factual error, unverifiable specific number, OR touches any banned category\n\nBANNED CATEGORY CHECK — classify as WRONG if the description touches any of these, regardless of factual accuracy:\n- Immigration, expat populations, demographic breakdown by nationality or origin\n- Death, human remains, burials, cemeteries, executions, disasters or tragedies\n- Politics, elections, laws, military policy, economic policy\n- Facts that are not intrinsic to the named place (e.g. a river that flows through 11 countries is not a fact about one country)\n\nIf WRONG, provide a corrected version or suggest a different angle.\n\nRespond ONLY with valid JSON, no markdown:\n{"status": "CORRECT|AMBIGUOUS|WRONG", "note": "brief explanation", "correction": "corrected claim or empty string"}`, 400);
+  const verifyRaw = await callClaude(`You are a fact-checker. Assess this specific verifiable claim:\n\nClaim: "${parsed.key_claim}"\nFull description: "${fact}"\nContext (place): "${place}"${wikiContext}\n\nClassify into one of three categories:\n1. CORRECT: factually accurate and well-documented\n2. AMBIGUOUS: core event is real but a minor detail (e.g. year varying by 1-2 across sources) is uncertain\n3. WRONG: clear factual error, unverifiable specific number, OR touches any banned category\n\nBANNED CATEGORY CHECK — classify as WRONG if the description touches any of these, regardless of factual accuracy:\n- Immigration, expat populations, demographic breakdown by nationality or origin\n- Death, human remains, burials, cemeteries, executions, disasters or tragedies\n- Politics, elections, laws, military policy, economic policy\n- Wars, civil wars, armed conflicts or military invasions — even when framed with historical dates\n- Territorial disputes, colonial grievances, separatist movements or ongoing conflicts\n- Constitutional changes, transitions of government or changes in head of state\n- Famines, epidemics, genocides, massacres or humanitarian crises\n- Any sentence that ends with or implies ongoing conflict, dispute or suffering\n- Facts that are not intrinsic to the named place (e.g. a river that flows through 11 countries is not a fact about one country)\n\nTRAVELLER TONE CHECK — also classify as WRONG if:\n- The fact would make a visitor feel uncomfortable, sad, or politically aware\n- The fact describes something negative that happened to the place or its people\n- The fact ends on a note of conflict, loss, or unresolved tension\nAsk: "Would a visitor feel good reading this on a collectible stamp?" If no, it is WRONG.\n\nIf WRONG, provide a corrected version or suggest a different angle.\n\nRespond ONLY with valid JSON, no markdown:\n{"status": "CORRECT|AMBIGUOUS|WRONG", "note": "brief explanation", "correction": "corrected claim or empty string"}`, 400);
 
   const verifyResult = JSON.parse(verifyRaw);
   if (verifyResult.status === 'WRONG') {
