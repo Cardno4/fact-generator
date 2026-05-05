@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Fact Generator v42</title>
+  <title>Fact Generator v43</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -78,7 +78,7 @@
     /* Mode tabs */
     .mode-tabs { display: flex; margin-bottom: 1.25rem; border: 1px solid #e5e5e5; border-radius: 10px; overflow: hidden; background: #f9f9f8; }
     .mode-tab { flex: 1; padding: 9px 14px; font-size: 13px; font-weight: 500; border: none; background: transparent; cursor: pointer; color: #888; display: flex; align-items: center; justify-content: center; gap: 6px; }
-    .mode-tab:first-child { border-right: 1px solid #e5e5e5; }
+    .mode-tab:not(:last-child) { border-right: 1px solid #e5e5e5; }
     .mode-tab.active { background: #fff; color: #1a1a1a; }
     .mode-panel { display: none; }
     .mode-panel.active { display: block; }
@@ -324,6 +324,10 @@
         <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="2" rx="1" fill="currentColor"/><rect x="2" y="7" width="12" height="2" rx="1" fill="currentColor"/><rect x="2" y="11" width="8" height="2" rx="1" fill="currentColor"/></svg>
         Upload list / CSV
       </button>
+      <button class="mode-tab" id="tab-country">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M2 8h12M8 2c-2 2-3 4-3 6s1 4 3 6M8 2c2 2 3 4 3 6s-1 4-3 6" stroke="currentColor" stroke-width="1.3"/></svg>
+        Country descriptions
+      </button>
     </div>
 
     <!-- Single -->
@@ -400,6 +404,53 @@
     </div>
   </div>
 
+  <!-- Country mode panel -->
+  <div class="mode-panel" id="mode-country">
+    <div style="font-size:13px;color:#666;background:#f9f9f8;border:1px solid #e5e5e5;border-radius:10px;padding:12px 16px;margin-bottom:1.25rem;line-height:1.6;">
+      Generates a broad, country-level description for each entry — written in the same style as all stamp descriptions but focused on the country as a whole rather than a single specific fact. Upload a list of country names, one per row.
+    </div>
+    <div class="upload-zone" id="country-upload-zone">
+      <input type="file" id="country-file-input" accept=".csv,.xlsx,.xls,.txt" />
+      <div class="upload-icon">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+      </div>
+      <div class="upload-title">Drop your country list here, or click to browse</div>
+      <div class="upload-sub">CSV, Excel (.xlsx / .xls), or plain text (.txt)</div>
+      <div class="upload-hint">One country name per row.</div>
+    </div>
+    <div class="file-preview" id="country-file-preview">
+      <div class="file-icon" id="country-file-icon">CSV</div>
+      <div class="file-info">
+        <div class="file-name" id="country-file-name"></div>
+        <div class="file-meta" id="country-file-meta"></div>
+      </div>
+      <button class="file-clear" id="country-file-clear">Clear</button>
+    </div>
+    <div class="sheet-picker" id="country-sheet-picker">
+      <div class="sheet-picker-label">Select sheet &amp; column</div>
+      <div class="sheet-list" id="country-sheet-list"></div>
+      <div class="sheet-total" id="country-sheet-total"></div>
+    </div>
+    <button class="batch-run-btn" id="btn-country">Generate country descriptions</button>
+    <div class="progress-wrap" id="country-progress-wrap">
+      <div class="progress-top">
+        <span class="progress-label" id="country-progress-label">Processing…</span>
+        <span class="progress-count" id="country-progress-count">0 / 0</span>
+      </div>
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="country-progress-bar"></div></div>
+    </div>
+    <div id="results-country"></div>
+    <div class="export-bar" id="country-export-bar">
+      <span class="export-text">All done — export country descriptions</span>
+      <button class="export-btn" id="country-export-csv-btn">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2v9M4 8l4 4 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 13h12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        Export as CSV
+      </button>
+    </div>
+  </div>
+
   <!-- History panel -->
   <div class="panel" id="panel-history">
     <div class="db-toolbar">
@@ -468,6 +519,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('nav-history').addEventListener('click', () => switchNav('history'));
   document.getElementById('tab-single').addEventListener('click', () => switchMode('single'));
   document.getElementById('tab-batch').addEventListener('click', () => switchMode('batch'));
+  document.getElementById('tab-country').addEventListener('click', () => switchMode('country'));
   document.getElementById('btn-single').addEventListener('click', generateSingle);
   document.getElementById('q').addEventListener('keydown', e => { if (e.key === 'Enter') generateSingle(); });
   document.querySelectorAll('.tag[data-fill]').forEach(t => {
@@ -478,6 +530,15 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('export-csv-btn').addEventListener('click', exportBatchCSV);
   document.getElementById('export-gsheets-btn').addEventListener('click', exportBatchGSheets);
   document.getElementById('file-clear').addEventListener('click', clearFile);
+  document.getElementById('country-file-clear').addEventListener('click', clearCountryFile);
+  document.getElementById('btn-country').addEventListener('click', generateCountryBatch);
+  document.getElementById('country-export-csv-btn').addEventListener('click', exportCountryCSV);
+  const countryZone = document.getElementById('country-upload-zone');
+  countryZone.addEventListener('click', () => document.getElementById('country-file-input').click());
+  countryZone.addEventListener('dragover', e => { e.preventDefault(); countryZone.classList.add('drag-over'); });
+  countryZone.addEventListener('dragleave', () => countryZone.classList.remove('drag-over'));
+  countryZone.addEventListener('drop', e => { e.preventDefault(); countryZone.classList.remove('drag-over'); if (e.dataTransfer.files[0]) processCountryFile(e.dataTransfer.files[0]); });
+  document.getElementById('country-file-input').addEventListener('change', e => { if (e.target.files[0]) processCountryFile(e.target.files[0]); });
   document.getElementById('db-search').addEventListener('input', renderHistory);
   document.getElementById('db-export-xlsx-btn').addEventListener('click', exportHistoryXLSX);
   document.getElementById('db-export-csv-btn').addEventListener('click', exportHistoryCSV);
@@ -605,7 +666,7 @@ function switchNav(nav) {
   if (nav==='history') renderHistory();
 }
 function switchMode(mode) {
-  ['single','batch'].forEach(m => {
+  ['single','batch','country'].forEach(m => {
     document.getElementById(`mode-${m}`).classList.toggle('active', m===mode);
     document.getElementById(`tab-${m}`).classList.toggle('active', m===mode);
   });
@@ -1685,6 +1746,245 @@ function downloadCSV(rows, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href=url; a.download=filename; a.click();
   URL.revokeObjectURL(url);
+}
+
+// ── Country mode ──────────────────────────────────────────────────────────────
+let countrySheetData = [];
+let countryResults = [];
+
+function clearCountryFile() {
+  countrySheetData = [];
+  document.getElementById('country-file-preview').classList.remove('visible');
+  document.getElementById('country-sheet-picker').classList.remove('visible');
+  document.getElementById('country-file-input').value = '';
+  document.getElementById('country-sheet-list').innerHTML = '';
+  document.getElementById('country-sheet-total').textContent = '';
+  document.getElementById('results-country').innerHTML = '';
+  document.getElementById('country-export-bar').classList.remove('visible');
+  document.getElementById('country-progress-wrap').classList.remove('visible');
+}
+
+function processCountryFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  const iconEl = document.getElementById('country-file-icon');
+  iconEl.textContent = ext.toUpperCase();
+  iconEl.style.background = (ext==='csv'||ext==='txt') ? '#e8f4e8' : '#e8f0fe';
+  iconEl.style.color = (ext==='csv'||ext==='txt') ? '#1a6b3a' : '#1557c0';
+  document.getElementById('country-file-name').textContent = file.name;
+  document.getElementById('country-file-meta').textContent = 'Reading…';
+  document.getElementById('country-file-preview').classList.add('visible');
+
+  const reader = new FileReader();
+  if (ext==='csv'||ext==='txt') {
+    reader.onload = e => {
+      const lines = e.target.result.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+      if (!lines.length) { alert('File appears empty.'); return; }
+      const cols = lines[0].split(',').map(c=>c.replace(/^"|"$/g,'').trim());
+      if (cols.length > 1) {
+        countrySheetData = [{ sheetName: file.name, headers: cols, rows: lines.slice(1).map(l=>l.split(',').map(c=>c.replace(/^"|"$/g,'').trim())), selectedCol: 0, enabled: true }];
+        showCountrySheetPicker();
+      } else {
+        countrySheetData = [{ sheetName: file.name, headers: ['Country'], rows: lines.map(l=>[l]), selectedCol: 0, enabled: true }];
+        document.getElementById('country-sheet-picker').classList.remove('visible');
+      }
+      document.getElementById('country-file-meta').textContent = `${countrySheetData[0].rows.length} countries detected`;
+    };
+    reader.readAsText(file);
+  } else if (ext==='xlsx'||ext==='xls') {
+    reader.onload = e => {
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      countrySheetData = [];
+      wb.SheetNames.forEach(name => {
+        const ws = wb.Sheets[name];
+        const data = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+        if (data.length < 2) return;
+        const rows = data.slice(1).filter(r=>r.some(c=>String(c).trim()));
+        if (rows.length) countrySheetData.push({ sheetName: name, headers: data[0].map(String), rows, selectedCol: 0, enabled: true });
+      });
+      if (!countrySheetData.length) { alert('No usable sheets found.'); return; }
+      const total = countrySheetData.reduce((s,d)=>s+d.rows.length,0);
+      document.getElementById('country-file-meta').textContent = `${countrySheetData.length} sheet${countrySheetData.length>1?'s':''}, ${total} rows total`;
+      showCountrySheetPicker();
+    };
+    reader.readAsArrayBuffer(file);
+  }
+}
+
+function showCountrySheetPicker() {
+  const picker = document.getElementById('country-sheet-picker');
+  const list = document.getElementById('country-sheet-list');
+  picker.classList.add('visible');
+  list.innerHTML = '';
+  countrySheetData.forEach((sheet, si) => {
+    const row = document.createElement('div');
+    row.className = 'sheet-row expanded';
+    const colOptions = sheet.headers.map((h,ci)=>`<option value="${ci}">${esc(h)||'Column '+(ci+1)}</option>`).join('');
+    const samples = sheet.rows.slice(0,3).map(r=>String(r[sheet.selectedCol]||'').trim()).filter(Boolean);
+    const preview = samples.length ? 'e.g. '+samples.join(', ') : 'No values';
+    row.innerHTML = `
+      <div class="sheet-row-top">
+        <input type="checkbox" class="sheet-checkbox" id="country-cb-${si}" checked data-sheet-index="${si}" />
+        <label class="sheet-name" for="country-cb-${si}">${esc(sheet.sheetName)}</label>
+        <span class="sheet-row-count">${sheet.rows.length} rows</span>
+      </div>
+      <div class="sheet-col-wrap">
+        <div class="sheet-col-label">Which column contains the country names?</div>
+        <select class="sheet-col-select" id="country-col-${si}" data-sheet-index="${si}">${colOptions}</select>
+        <div class="sheet-col-preview" id="country-preview-${si}">${esc(preview)}</div>
+      </div>`;
+    list.appendChild(row);
+    row.querySelector('.sheet-checkbox').addEventListener('change', function() {
+      countrySheetData[si].enabled = this.checked;
+      row.classList.toggle('expanded', this.checked);
+      updateCountryTotal();
+    });
+    row.querySelector('.sheet-col-select').addEventListener('change', function() {
+      countrySheetData[si].selectedCol = parseInt(this.value);
+      const s = countrySheetData[si].rows.slice(0,3).map(r=>String(r[countrySheetData[si].selectedCol]||'').trim()).filter(Boolean);
+      document.getElementById(`country-preview-${si}`).textContent = s.length ? 'e.g. '+s.join(', ') : 'No values';
+      updateCountryTotal();
+    });
+  });
+  updateCountryTotal();
+}
+
+function updateCountryTotal() {
+  const enabled = countrySheetData.filter(s=>s.enabled);
+  const total = enabled.reduce((sum,s) => sum + s.rows.map(r=>String(r[s.selectedCol]||'').trim()).filter(Boolean).length, 0);
+  document.getElementById('country-sheet-total').textContent = `${total} countries to generate descriptions for`;
+}
+
+async function generateCountryDescription(country) {
+  const raw = await callClaude(`You are a writer creating stamp descriptions for a passport collectible travel app. Write a broad, country-level description for: "${country}"
+
+The description must capture the country as a whole — its geography, culture, history, or global significance — rather than focusing on one single narrow fact.
+
+STRICT RULES:
+- The description must be a single complete sentence
+- It must be between 150 and 240 characters long — count carefully
+- It must be factually accurate and verifiable
+- It must feel positive, inspiring and suitable for a collectible travel stamp
+- Do NOT use em dashes (—) under any circumstances. Use commas or restructure instead
+- Do NOT use the words "houses", "spanning", or "significant"
+- Do NOT start with "${country}" as the subject — vary the opening
+- Do NOT mention wars, conflicts, tragedies, colonial grievances, or anything that would make a visitor feel uncomfortable
+- Do NOT use soft superlatives like "one of the most" unless the claim is directly verifiable
+- The tone should match this example for the Netherlands: "The Netherlands sits at the meeting point of some of Europe's great rivers and the North Sea, and has built one of the world's most open and internationally connected societies, becoming a global centre of trade, art and diplomacy since the Dutch Golden Age of the 17th century."
+
+Respond ONLY with valid JSON, no markdown:
+{"description": "the single sentence description here", "stamp_intro": "You got this stamp by visiting ${country}."}`, 400);
+
+  const parsed = JSON.parse(raw);
+  if (!parsed.description) throw new Error('No description returned');
+  if (parsed.description.length < 150 || parsed.description.length > 240) {
+    throw new Error(`Length out of range: ${parsed.description.length} chars`);
+  }
+  if (parsed.description.includes('\u2014') || parsed.description.includes('\u2013')) {
+    throw new Error('Em dash detected in output');
+  }
+  return parsed;
+}
+
+async function generateCountryBatch() {
+  if (!countrySheetData.length) { alert('Please upload a file first.'); return; }
+
+  const allCountries = [];
+  countrySheetData.filter(s=>s.enabled).forEach(sheet => {
+    sheet.rows.forEach(r => {
+      const val = String(r[sheet.selectedCol]||'').trim();
+      if (val) allCountries.push(val);
+    });
+  });
+  if (!allCountries.length) { alert('No country names found.'); return; }
+
+  const btn = document.getElementById('btn-country');
+  btn.disabled = true; btn.textContent = 'Generating…';
+  countryResults = allCountries.map(c => ({ country: c, description: null, stamp_intro: null, error: null }));
+
+  const pw = document.getElementById('country-progress-wrap');
+  const pb = document.getElementById('country-progress-bar');
+  const pl = document.getElementById('country-progress-label');
+  const pc = document.getElementById('country-progress-count');
+  pw.classList.add('visible');
+  const container = document.getElementById('results-country');
+  container.innerHTML = '';
+  document.getElementById('country-export-bar').classList.remove('visible');
+
+  for (let i=0; i<allCountries.length; i++) {
+    const country = allCountries[i];
+    pl.textContent = `Generating description for ${country}…`;
+    pc.textContent = `${i} / ${allCountries.length}`;
+    pb.style.width = `${(i/allCountries.length)*100}%`;
+
+    const group = document.createElement('div');
+    group.className = 'place-group';
+    group.innerHTML = `
+      <div class="place-heading"><div class="place-num">${i+1}</div><span>${esc(country)}</span></div>
+      <div class="loading" id="country-loading-${i}" style="padding:1rem 0;font-size:13px">Generating${dots()}</div>`;
+    container.appendChild(group);
+    group.scrollIntoView({ behavior:'smooth', block:'nearest' });
+
+    let success = false;
+    for (let attempt=1; attempt<=3; attempt++) {
+      try {
+        const result = await generateCountryDescription(country);
+        countryResults[i].description = result.description;
+        countryResults[i].stamp_intro = result.stamp_intro;
+
+        const full = `${result.stamp_intro}\n\n${result.description}`;
+        const card = document.createElement('div');
+        card.className = 'fact-card';
+        card.innerHTML = `
+          <div class="fact-card-header">
+            <span class="fact-verified-badge">
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.3"/><path d="M5 8.5l2 2 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Generated
+            </span>
+            <span class="fact-type-label">Country description</span>
+          </div>
+          <div class="fact-text">${esc(result.description)}</div>
+          <div class="fact-foot">
+            <span class="char-count">${result.description.length} chars</span>
+            <button class="copy-fact-btn" onclick="navigator.clipboard.writeText(${JSON.stringify(full)});this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',2000)">Copy</button>
+          </div>`;
+        group.querySelector(`#country-loading-${i}`).replaceWith(card);
+        success = true;
+        break;
+      } catch(e) {
+        if (attempt === 3) {
+          countryResults[i].error = e.message;
+          const errDiv = document.createElement('div');
+          errDiv.style.cssText = 'font-size:13px;color:#c00;padding:8px 0';
+          errDiv.innerHTML = `<strong>Could not generate a description.</strong><br><span style="color:#aaa">${esc(e.message)}</span>`;
+          group.querySelector(`#country-loading-${i}`).replaceWith(errDiv);
+        } else {
+          await sleep(600);
+        }
+      }
+    }
+    if (i < allCountries.length-1) await sleep(400);
+  }
+
+  pl.textContent = 'All done!';
+  pc.textContent = `${allCountries.length} / ${allCountries.length}`;
+  pb.style.width = '100%';
+  btn.disabled = false;
+  btn.textContent = 'Generate country descriptions';
+  document.getElementById('country-export-bar').classList.add('visible');
+}
+
+function exportCountryCSV() {
+  if (!countryResults.length) return;
+  const rows = [['Country', 'Stamp Intro', 'Broad Description', 'Full Stamp Description', 'Char Count', 'Status', 'Failure Reason']];
+  countryResults.forEach(r => {
+    if (r.description) {
+      const full = `${r.stamp_intro}\n\n${r.description}`;
+      rows.push([r.country, r.stamp_intro, r.description, full, r.description.length, 'Generated', '']);
+    } else {
+      rows.push([r.country, '', '', '', '', 'Failed', r.error||'Could not generate after 3 attempts']);
+    }
+  });
+  downloadCSV(rows, 'country-descriptions.csv');
 }
 </script>
 </body>
