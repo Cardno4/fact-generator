@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Fact Generator v41</title>
+  <title>Fact Generator v42</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -787,6 +787,14 @@ PREFERRED FACT CATEGORIES (in order of preference — use earlier categories bef
 5. Geography: size, elevation, terrain — only if the above categories are exhausted
 
 RULES FOR NUMBERS: Only use a specific number if it appears in the Wikipedia-confirmed facts list above. Maximum TWO numbers per description.
+
+WORD VARIETY RULE — these words and phrases are overused across the database. Avoid them wherever possible and use the alternatives instead:
+- "houses" → use "holds", "contains", "displays", "is home to", "keeps", "preserves", "maintains", "stores", "showcases"
+- "spanning" → use "covering", "across", "ranging from", "from X to Y", "spread across"
+- "significant" → use "remarkable", "notable", "important", "extraordinary", "exceptional"
+- "houses one of the most" → rewrite the sentence entirely to avoid this construction
+- Do NOT begin the description with "The [place name] houses..." — find a different sentence structure.
+- Vary your sentence openings: start with a year, a name, a quantity, a subordinate clause, or the subject doing something, rather than always "[Museum] houses/contains/holds..."
 
 Also return a category label for the fact you chose from this fixed list:
 "founding_history" | "architecture_engineering" | "cultural_UNESCO" | "natural_world" | "geography_islands" | "geography_coastline" | "geography_borders" | "geography_lakes" | "geography_mountains" | "geography_other" | "record_claim"${seenHint}${retryHint}${correctionSeed}
