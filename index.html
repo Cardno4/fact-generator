@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Fact Generator v45</title>
+  <title>Fact Generator v46</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -292,7 +292,7 @@
 <div class="container" id="app-screen">
   <div class="topbar">
     <div class="topbar-left">
-      <h1>Fact Generator <span style="font-size:13px;font-weight:400;color:#bbb;letter-spacing:0.02em">v45</span></h1>
+      <h1>Fact Generator <span style="font-size:13px;font-weight:400;color:#bbb;letter-spacing:0.02em">v46</span></h1>
       <p>One verified stamp description per place — shown with stamp framing line, factual claim confirmed before display</p>
     </div>
     <div class="topbar-right">
@@ -327,6 +327,10 @@
       <button class="mode-tab" id="tab-country">
         <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M2 8h12M8 2c-2 2-3 4-3 6s1 4 3 6M8 2c2 2 3 4 3 6s-1 4-3 6" stroke="currentColor" stroke-width="1.3"/></svg>
         Country descriptions
+      </button>
+      <button class="mode-tab" id="tab-airport">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 11l4-4 2 2 4-5 2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M1 13h14" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        Airport descriptions
       </button>
     </div>
 
@@ -451,6 +455,53 @@
     </div>
   </div>
 
+  <!-- Airport mode panel -->
+  <div class="mode-panel" id="mode-airport">
+    <div style="font-size:13px;color:#666;background:#f9f9f8;border:1px solid #e5e5e5;border-radius:10px;padding:12px 16px;margin-bottom:1.25rem;line-height:1.6;">
+      Generates a standalone fact for each airport — no stamp intro, just the description. Upload a list with airport name and city columns. Focuses on architecture, history, engineering and design rather than passenger statistics.
+    </div>
+    <div class="upload-zone" id="airport-upload-zone">
+      <input type="file" id="airport-file-input" accept=".csv,.xlsx,.xls,.txt" />
+      <div class="upload-icon">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+      </div>
+      <div class="upload-title">Drop your airport list here, or click to browse</div>
+      <div class="upload-sub">CSV, Excel (.xlsx / .xls), or plain text (.txt)</div>
+      <div class="upload-hint">Needs at least an airport name column. A city column is recommended for context.</div>
+    </div>
+    <div class="file-preview" id="airport-file-preview">
+      <div class="file-icon" id="airport-file-icon">CSV</div>
+      <div class="file-info">
+        <div class="file-name" id="airport-file-name"></div>
+        <div class="file-meta" id="airport-file-meta"></div>
+      </div>
+      <button class="file-clear" id="airport-file-clear">Clear</button>
+    </div>
+    <div class="sheet-picker" id="airport-sheet-picker">
+      <div class="sheet-picker-label">Select sheet &amp; columns</div>
+      <div class="sheet-list" id="airport-sheet-list"></div>
+      <div class="sheet-total" id="airport-sheet-total"></div>
+    </div>
+    <button class="batch-run-btn" id="btn-airport">Generate airport descriptions</button>
+    <div class="progress-wrap" id="airport-progress-wrap">
+      <div class="progress-top">
+        <span class="progress-label" id="airport-progress-label">Processing…</span>
+        <span class="progress-count" id="airport-progress-count">0 / 0</span>
+      </div>
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="airport-progress-bar"></div></div>
+    </div>
+    <div id="results-airport"></div>
+    <div class="export-bar" id="airport-export-bar">
+      <span class="export-text">All done — export airport descriptions</span>
+      <button class="export-btn" id="airport-export-csv-btn">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2v9M4 8l4 4 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 13h12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        Export as CSV
+      </button>
+    </div>
+  </div>
+
   <!-- History panel -->
   <div class="panel" id="panel-history">
     <div class="db-toolbar">
@@ -520,6 +571,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('tab-single').addEventListener('click', () => switchMode('single'));
   document.getElementById('tab-batch').addEventListener('click', () => switchMode('batch'));
   document.getElementById('tab-country').addEventListener('click', () => switchMode('country'));
+  document.getElementById('tab-airport').addEventListener('click', () => switchMode('airport'));
   document.getElementById('btn-single').addEventListener('click', generateSingle);
   document.getElementById('q').addEventListener('keydown', e => { if (e.key === 'Enter') generateSingle(); });
   document.querySelectorAll('.tag[data-fill]').forEach(t => {
@@ -531,6 +583,15 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('export-gsheets-btn').addEventListener('click', exportBatchGSheets);
   document.getElementById('file-clear').addEventListener('click', clearFile);
   document.getElementById('country-file-clear').addEventListener('click', clearCountryFile);
+  document.getElementById('airport-file-clear').addEventListener('click', clearAirportFile);
+  document.getElementById('btn-airport').addEventListener('click', generateAirportBatch);
+  document.getElementById('airport-export-csv-btn').addEventListener('click', exportAirportCSV);
+  const airportZone = document.getElementById('airport-upload-zone');
+  airportZone.addEventListener('click', () => document.getElementById('airport-file-input').click());
+  airportZone.addEventListener('dragover', e => { e.preventDefault(); airportZone.classList.add('drag-over'); });
+  airportZone.addEventListener('dragleave', () => airportZone.classList.remove('drag-over'));
+  airportZone.addEventListener('drop', e => { e.preventDefault(); airportZone.classList.remove('drag-over'); if (e.dataTransfer.files[0]) processAirportFile(e.dataTransfer.files[0]); });
+  document.getElementById('airport-file-input').addEventListener('change', e => { if (e.target.files[0]) processAirportFile(e.target.files[0]); });
   document.getElementById('btn-country').addEventListener('click', generateCountryBatch);
   document.getElementById('country-export-csv-btn').addEventListener('click', exportCountryCSV);
   const countryZone = document.getElementById('country-upload-zone');
@@ -666,7 +727,7 @@ function switchNav(nav) {
   if (nav==='history') renderHistory();
 }
 function switchMode(mode) {
-  ['single','batch','country'].forEach(m => {
+  ['single','batch','country','airport'].forEach(m => {
     document.getElementById(`mode-${m}`).classList.toggle('active', m===mode);
     document.getElementById(`tab-${m}`).classList.toggle('active', m===mode);
   });
@@ -1042,6 +1103,72 @@ function handleCardClick(e) {
     const sid = btn.dataset.storeId;
     const text = window['_cstore'] && window['_cstore'][sid];
     if (text) copyToClipboard(text, btn);
+  }
+
+  if (action === 'retry-airport') {
+    const name = btn.dataset.name;
+    const city = btn.dataset.city || '';
+    const idx = parseInt(btn.dataset.index);
+    if (!name) return;
+    const group = btn.closest('.place-group');
+    if (!group) return;
+    const cardOrErr = btn.closest('.fact-card') || btn.closest('div[style*="color:#c00"]');
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'loading';
+    loadingDiv.id = `airport-loading-${idx}`;
+    loadingDiv.style.cssText = 'padding:1rem 0;font-size:13px';
+    loadingDiv.innerHTML = `Generating${dots()}`;
+    if (cardOrErr) cardOrErr.replaceWith(loadingDiv);
+    (async () => {
+      let lastErr = '';
+      for (let attempt=1; attempt<=4; attempt++) {
+        try {
+          const description = await generateAirportDescription(name, city, lastErr);
+          if (airportResults[idx]) airportResults[idx] = { name, city, description, error: null };
+          const storeId = 'a_' + idx + '_' + Date.now();
+          window['_cstore'] = window['_cstore'] || {};
+          window['_cstore'][storeId] = description;
+          const card = document.createElement('div');
+          card.className = 'fact-card';
+          card.innerHTML = `
+            <div class="fact-card-header">
+              <span class="fact-verified-badge">
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.3"/><path d="M5 8.5l2 2 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Generated
+              </span>
+              <span class="fact-type-label">Airport description</span>
+            </div>
+            <div class="fact-text">${esc(description)}</div>
+            <div class="fact-foot">
+              <span class="char-count">${description.length} chars</span>
+              <button class="verify-btn" data-action="retry-airport" data-name="${esc(name)}" data-city="${esc(city)}" data-index="${idx}">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M13.5 2.5A6.5 6.5 0 1 1 7 1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><polyline points="10 1 7 1 7 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                New description
+              </button>
+              <button class="copy-fact-btn" data-action="copy-country" data-store-id="${storeId}">Copy</button>
+            </div>`;
+          document.getElementById(`airport-loading-${idx}`).replaceWith(card);
+          break;
+        } catch(e) {
+          lastErr = e.message;
+          if (attempt === 4) {
+            if (airportResults[idx]) airportResults[idx].error = e.message;
+            const errDiv = document.createElement('div');
+            errDiv.style.cssText = 'font-size:13px;color:#c00;padding:8px 0';
+            errDiv.innerHTML = `
+              <strong>Could not generate a description.</strong><br>
+              <span style="color:#aaa">${esc(e.message)}</span>
+              <br><button class="verify-btn" data-action="retry-airport" data-name="${esc(name)}" data-city="${esc(city)}" data-index="${idx}" style="margin-top:8px">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M13.5 2.5A6.5 6.5 0 1 1 7 1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><polyline points="10 1 7 1 7 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Try again
+              </button>`;
+            document.getElementById(`airport-loading-${idx}`).replaceWith(errDiv);
+          } else {
+            await sleep(600);
+          }
+        }
+      }
+    })();
   }
 
   if (action === 'retry-country') {
@@ -1821,6 +1948,279 @@ function downloadCSV(rows, filename) {
   const a = document.createElement('a'); a.href=url; a.download=filename; a.click();
   URL.revokeObjectURL(url);
 }
+
+// ── Airport mode ──────────────────────────────────────────────────────────────
+let airportSheetData = [];
+let airportResults = [];
+
+function clearAirportFile() {
+  airportSheetData = [];
+  document.getElementById('airport-file-preview').classList.remove('visible');
+  document.getElementById('airport-sheet-picker').classList.remove('visible');
+  document.getElementById('airport-file-input').value = '';
+  document.getElementById('airport-sheet-list').innerHTML = '';
+  document.getElementById('airport-sheet-total').textContent = '';
+  document.getElementById('results-airport').innerHTML = '';
+  document.getElementById('airport-export-bar').classList.remove('visible');
+  document.getElementById('airport-progress-wrap').classList.remove('visible');
+}
+
+function processAirportFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  const iconEl = document.getElementById('airport-file-icon');
+  iconEl.textContent = ext.toUpperCase();
+  iconEl.style.background = (ext==='csv'||ext==='txt') ? '#e8f4e8' : '#e8f0fe';
+  iconEl.style.color = (ext==='csv'||ext==='txt') ? '#1a6b3a' : '#1557c0';
+  document.getElementById('airport-file-name').textContent = file.name;
+  document.getElementById('airport-file-meta').textContent = 'Reading…';
+  document.getElementById('airport-file-preview').classList.add('visible');
+
+  const reader = new FileReader();
+  if (ext==='csv'||ext==='txt') {
+    reader.onload = e => {
+      const lines = e.target.result.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+      if (!lines.length) { alert('File appears empty.'); return; }
+      const cols = lines[0].split(',').map(c=>c.replace(/^"|"$/g,'').trim());
+      airportSheetData = [{ sheetName: file.name, headers: cols, rows: lines.slice(1).map(l=>l.split(',').map(c=>c.replace(/^"|"$/g,'').trim())), nameCol: 0, cityCol: cols.length > 1 ? 1 : -1, enabled: true }];
+      document.getElementById('airport-file-meta').textContent = `${airportSheetData[0].rows.length} airports detected`;
+      showAirportSheetPicker();
+    };
+    reader.readAsText(file);
+  } else if (ext==='xlsx'||ext==='xls') {
+    reader.onload = e => {
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      airportSheetData = [];
+      wb.SheetNames.forEach(name => {
+        const ws = wb.Sheets[name];
+        const data = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+        if (data.length < 2) return;
+        const rows = data.slice(1).filter(r=>r.some(c=>String(c).trim()));
+        if (rows.length) airportSheetData.push({ sheetName: name, headers: data[0].map(String), rows, nameCol: 0, cityCol: data[0].length > 1 ? 1 : -1, enabled: true });
+      });
+      if (!airportSheetData.length) { alert('No usable sheets found.'); return; }
+      const total = airportSheetData.reduce((s,d)=>s+d.rows.length,0);
+      document.getElementById('airport-file-meta').textContent = `${airportSheetData.length} sheet${airportSheetData.length>1?'s':''}, ${total} rows total`;
+      showAirportSheetPicker();
+    };
+    reader.readAsArrayBuffer(file);
+  }
+}
+
+function showAirportSheetPicker() {
+  const picker = document.getElementById('airport-sheet-picker');
+  const list = document.getElementById('airport-sheet-list');
+  picker.classList.add('visible');
+  list.innerHTML = '';
+  airportSheetData.forEach((sheet, si) => {
+    const row = document.createElement('div');
+    row.className = 'sheet-row expanded';
+    const colOptions = sheet.headers.map((h,ci)=>`<option value="${ci}">${esc(h)||'Column '+(ci+1)}</option>`).join('');
+    const noneOption = '<option value="-1">— None —</option>';
+    const samples = sheet.rows.slice(0,3).map(r=>String(r[sheet.nameCol]||'').trim()).filter(Boolean);
+    const preview = samples.length ? 'e.g. '+samples.join(', ') : 'No values';
+    row.innerHTML = `
+      <div class="sheet-row-top">
+        <input type="checkbox" class="sheet-checkbox" id="airport-cb-${si}" checked data-sheet-index="${si}" />
+        <label class="sheet-name" for="airport-cb-${si}">${esc(sheet.sheetName)}</label>
+        <span class="sheet-row-count">${sheet.rows.length} rows</span>
+      </div>
+      <div class="sheet-col-wrap">
+        <div class="sheet-col-label">Airport name column</div>
+        <select class="sheet-col-select" id="airport-namecol-${si}" data-sheet-index="${si}">${colOptions}</select>
+        <div class="sheet-col-label" style="margin-top:8px">City column <span style="color:#bbb;font-weight:400">(optional but recommended)</span></div>
+        <select class="sheet-col-select" id="airport-citycol-${si}" data-sheet-index="${si}">${noneOption}${colOptions}</select>
+        <div class="sheet-col-preview" id="airport-preview-${si}">${esc(preview)}</div>
+      </div>`;
+    list.appendChild(row);
+    row.querySelector('.sheet-checkbox').addEventListener('change', function() {
+      airportSheetData[si].enabled = this.checked;
+      row.classList.toggle('expanded', this.checked);
+      updateAirportTotal();
+    });
+    row.querySelector(`#airport-namecol-${si}`).addEventListener('change', function() {
+      airportSheetData[si].nameCol = parseInt(this.value);
+      const s = airportSheetData[si].rows.slice(0,3).map(r=>String(r[airportSheetData[si].nameCol]||'').trim()).filter(Boolean);
+      document.getElementById(`airport-preview-${si}`).textContent = s.length ? 'e.g. '+s.join(', ') : 'No values';
+      updateAirportTotal();
+    });
+    row.querySelector(`#airport-citycol-${si}`).addEventListener('change', function() {
+      airportSheetData[si].cityCol = parseInt(this.value);
+    });
+  });
+  updateAirportTotal();
+}
+
+function updateAirportTotal() {
+  const enabled = airportSheetData.filter(s=>s.enabled);
+  const total = enabled.reduce((sum,s) => sum + s.rows.map(r=>String(r[s.nameCol]||'').trim()).filter(Boolean).length, 0);
+  document.getElementById('airport-sheet-total').textContent = `${total} airports to generate descriptions for`;
+}
+
+async function generateAirportDescription(airportName, city, lastError='') {
+  const cityContext = city ? ` in ${city}` : '';
+  const retryHint = lastError ? `\n\nPREVIOUS ATTEMPT FAILED: ${lastError}. Adjust accordingly.` : '';
+  const raw = await callClaude(`You are a writer creating descriptions for a passport collectible travel app. Write a single factual description about: "${airportName}"${cityContext}
+
+The description must be a standalone fact — there is NO stamp intro line. The description IS the complete entry.
+
+FOCUS: Find the most interesting angle from architecture, engineering, design, history, location or a genuine surprise fact. This airport's story should feel unique and worth reading.
+
+STRICTLY AVOID — these produce generic, dull descriptions:
+- Total passenger numbers or rankings by passenger volume
+- Number of runways, gates or terminals as the main fact
+- Total floor area or site size comparisons
+- Carbon neutral or sustainability claims unless tied to a specific surprising detail
+- "One of the busiest airports in [region]" constructions
+- Comparisons to football pitches or other size analogies
+
+GOOD ANGLES TO EXPLORE:
+- How and when the airport was built, especially unusual construction methods or location challenges
+- Architectural innovations in terminal design
+- Historical firsts — first jet bridges, first to open in a region, wartime history
+- Unusual location facts — built on reclaimed land, extreme altitude, island sites
+- Unique features that distinguish this airport from all others
+- Famous or surprising connections to art, culture, or the city it serves
+
+TONE: Factual, grounded, encyclopaedic. The same tone as a well-written travel stamp description. Not promotional. No travel brochure language.
+
+STRICT RULES:
+- Single complete sentence only
+- Between 200 and 280 characters — HARD limits. If the fact is strong at under 250, do not pad it. Only exceed 250 if genuinely needed for the sentence to be complete and specific.
+- Factually accurate and verifiable
+- No em dashes (—) under any circumstances — use commas or restructure
+- No words: "houses", "spanning", "significant", "nestled", "boasts", "sprawling"
+- Do NOT mention wars, conflicts, or anything that would make a visitor uncomfortable${retryHint}
+
+Respond ONLY with valid JSON, no markdown:
+{"description": "the single sentence here"}`, 350);
+
+  const parsed = JSON.parse(raw);
+  if (!parsed.description) throw new Error('No description returned');
+  const len = parsed.description.length;
+  if (len < 200 || len > 280) throw new Error(`Length out of range: ${len} chars (need 200-280)`);
+  if (parsed.description.includes('\u2014') || parsed.description.includes('\u2013')) throw new Error('Em dash detected');
+  return parsed.description;
+}
+
+async function generateAirportBatch() {
+  if (!airportSheetData.length) { alert('Please upload a file first.'); return; }
+
+  const allAirports = [];
+  airportSheetData.filter(s=>s.enabled).forEach(sheet => {
+    sheet.rows.forEach(r => {
+      const name = String(r[sheet.nameCol]||'').trim();
+      const city = sheet.cityCol >= 0 ? String(r[sheet.cityCol]||'').trim() : '';
+      if (name) allAirports.push({ name, city });
+    });
+  });
+  if (!allAirports.length) { alert('No airport names found.'); return; }
+
+  const btn = document.getElementById('btn-airport');
+  btn.disabled = true; btn.textContent = 'Generating…';
+  airportResults = allAirports.map(a => ({ name: a.name, city: a.city, description: null, error: null }));
+
+  const pw = document.getElementById('airport-progress-wrap');
+  const pb = document.getElementById('airport-progress-bar');
+  const pl = document.getElementById('airport-progress-label');
+  const pc = document.getElementById('airport-progress-count');
+  pw.classList.add('visible');
+  const container = document.getElementById('results-airport');
+  container.innerHTML = '';
+  document.getElementById('airport-export-bar').classList.remove('visible');
+
+  for (let i=0; i<allAirports.length; i++) {
+    const { name, city } = allAirports[i];
+    const label = city ? `${name} (${city})` : name;
+    pl.textContent = `Generating description for ${name}…`;
+    pc.textContent = `${i} / ${allAirports.length}`;
+    pb.style.width = `${(i/allAirports.length)*100}%`;
+
+    const group = document.createElement('div');
+    group.className = 'place-group';
+    group.innerHTML = `
+      <div class="place-heading"><div class="place-num">${i+1}</div><span>${esc(label)}</span></div>
+      <div class="loading" id="airport-loading-${i}" style="padding:1rem 0;font-size:13px">Generating${dots()}</div>`;
+    container.appendChild(group);
+    group.scrollIntoView({ behavior:'smooth', block:'nearest' });
+
+    let lastErr = '';
+    let success = false;
+    for (let attempt=1; attempt<=4; attempt++) {
+      try {
+        const description = await generateAirportDescription(name, city, lastErr);
+        airportResults[i].description = description;
+
+        const storeId = 'a_' + i + '_' + Date.now();
+        window['_cstore'] = window['_cstore'] || {};
+        window['_cstore'][storeId] = description;
+
+        const card = document.createElement('div');
+        card.className = 'fact-card';
+        card.innerHTML = `
+          <div class="fact-card-header">
+            <span class="fact-verified-badge">
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.3"/><path d="M5 8.5l2 2 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Generated
+            </span>
+            <span class="fact-type-label">Airport description</span>
+          </div>
+          <div class="fact-text">${esc(description)}</div>
+          <div class="fact-foot">
+            <span class="char-count">${description.length} chars</span>
+            <button class="verify-btn" data-action="retry-airport" data-name="${esc(name)}" data-city="${esc(city)}" data-index="${i}">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M13.5 2.5A6.5 6.5 0 1 1 7 1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><polyline points="10 1 7 1 7 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              New description
+            </button>
+            <button class="copy-fact-btn" data-action="copy-country" data-store-id="${storeId}">Copy</button>
+          </div>`;
+        group.querySelector(`#airport-loading-${i}`).replaceWith(card);
+        success = true;
+        break;
+      } catch(e) {
+        lastErr = e.message;
+        if (attempt === 4) {
+          airportResults[i].error = e.message;
+          const errDiv = document.createElement('div');
+          errDiv.style.cssText = 'font-size:13px;color:#c00;padding:8px 0';
+          errDiv.innerHTML = `
+            <strong>Could not generate a description.</strong><br>
+            <span style="color:#aaa">${esc(e.message)}</span>
+            <br><button class="verify-btn" data-action="retry-airport" data-name="${esc(name)}" data-city="${esc(city)}" data-index="${i}" style="margin-top:8px">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M13.5 2.5A6.5 6.5 0 1 1 7 1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><polyline points="10 1 7 1 7 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Try again
+            </button>`;
+          group.querySelector(`#airport-loading-${i}`).replaceWith(errDiv);
+        } else {
+          await sleep(600);
+        }
+      }
+    }
+    if (i < allAirports.length-1) await sleep(400);
+  }
+
+  pl.textContent = 'All done!';
+  pc.textContent = `${allAirports.length} / ${allAirports.length}`;
+  pb.style.width = '100%';
+  btn.disabled = false;
+  btn.textContent = 'Generate airport descriptions';
+  document.getElementById('airport-export-bar').classList.add('visible');
+}
+
+function exportAirportCSV() {
+  if (!airportResults.length) return;
+  const rows = [['Airport', 'City', 'Description', 'Char Count', 'Status', 'Failure Reason']];
+  airportResults.forEach(r => {
+    if (r.description) {
+      rows.push([r.name, r.city||'', r.description, r.description.length, 'Generated', '']);
+    } else {
+      rows.push([r.name, r.city||'', '', '', 'Failed', r.error||'Could not generate after 4 attempts']);
+    }
+  });
+  downloadCSV(rows, 'airport-descriptions.csv');
+}
+
+// Retry airport handler (added to existing handleCardClick delegation)
+// Handled via data-action="retry-airport" in handleCardClick
 
 // ── Country mode ──────────────────────────────────────────────────────────────
 let countrySheetData = [];
