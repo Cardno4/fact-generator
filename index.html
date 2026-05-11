@@ -1153,7 +1153,10 @@ function handleCardClick(e) {
               </button>
               <button class="copy-fact-btn" data-action="copy-country" data-store-id="${storeId}">Copy</button>
             </div>`;
-          document.getElementById(`airport-loading-${idx}`).replaceWith(card);
+          const loadingEl = group.querySelector(`#airport-loading-${idx}`) || loadingDiv;
+          const targetEl = group.contains(loadingEl) ? loadingEl : loadingDiv;
+          if (group.contains(targetEl)) targetEl.replaceWith(card);
+          else group.appendChild(card);
           break;
         } catch(e) {
           lastErr = e.message;
@@ -1168,7 +1171,9 @@ function handleCardClick(e) {
                 <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M13.5 2.5A6.5 6.5 0 1 1 7 1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><polyline points="10 1 7 1 7 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 Try again
               </button>`;
-            document.getElementById(`airport-loading-${idx}`).replaceWith(errDiv);
+            const loadingEl2 = group.querySelector(`#airport-loading-${idx}`) || loadingDiv;
+            if (group.contains(loadingEl2)) loadingEl2.replaceWith(errDiv);
+            else group.appendChild(errDiv);
           } else {
             await sleep(600);
           }
@@ -2227,7 +2232,9 @@ async function generateAirportBatch() {
             </button>
             <button class="copy-fact-btn" data-action="copy-country" data-store-id="${storeId}">Copy</button>
           </div>`;
-        group.querySelector(`#airport-loading-${i}`).replaceWith(card);
+        const loadingEl = group.querySelector(`#airport-loading-${i}`);
+        if (loadingEl) loadingEl.replaceWith(card);
+        else group.appendChild(card);
         success = true;
         break;
       } catch(e) {
@@ -2243,7 +2250,9 @@ async function generateAirportBatch() {
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M13.5 2.5A6.5 6.5 0 1 1 7 1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><polyline points="10 1 7 1 7 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
               Try again
             </button>`;
-          group.querySelector(`#airport-loading-${i}`).replaceWith(errDiv);
+          const loadingEl = group.querySelector(`#airport-loading-${i}`);
+          if (loadingEl) loadingEl.replaceWith(errDiv);
+          else group.appendChild(errDiv);
         } else {
           await sleep(600);
         }
