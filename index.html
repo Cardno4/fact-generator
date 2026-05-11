@@ -1125,6 +1125,7 @@ function handleCardClick(e) {
         try {
           const description = await generateAirportDescription(name, city, lastErr);
           if (airportResults[idx]) airportResults[idx] = { name, city, description, error: null };
+          dbAddEntry(name, description, [], CURRENT_SESSION_ID, city, '');
           const storeId = 'a_' + idx + '_' + Date.now();
           window['_cstore'] = window['_cstore'] || {};
           window['_cstore'][storeId] = description;
@@ -2119,6 +2120,9 @@ async function generateAirportBatch() {
   btn.disabled = true; btn.textContent = 'Generating…';
   airportResults = allAirports.map(a => ({ name: a.name, city: a.city, description: null, error: null }));
 
+  // New session ID shared by every entry in this batch run
+  CURRENT_SESSION_ID = 'session_' + Date.now();
+
   const pw = document.getElementById('airport-progress-wrap');
   const pb = document.getElementById('airport-progress-bar');
   const pl = document.getElementById('airport-progress-label');
@@ -2149,6 +2153,7 @@ async function generateAirportBatch() {
       try {
         const description = await generateAirportDescription(name, city, lastErr);
         airportResults[i].description = description;
+        dbAddEntry(name, description, [], CURRENT_SESSION_ID, city, '');
 
         const storeId = 'a_' + i + '_' + Date.now();
         window['_cstore'] = window['_cstore'] || {};
