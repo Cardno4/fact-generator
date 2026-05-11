@@ -1125,7 +1125,12 @@ function handleCardClick(e) {
         try {
           const description = await generateAirportDescription(name, city, lastErr);
           if (airportResults[idx]) airportResults[idx] = { name, city, description, error: null };
-          dbAddEntry(name, description, [], CURRENT_SESSION_ID, city, '');
+          try {
+            dbAddEntry(name, description, [], CURRENT_SESSION_ID, city, '');
+            updateBadge();
+          } catch(dbErr) {
+            console.warn('History save failed:', dbErr);
+          }
           const storeId = 'a_' + idx + '_' + Date.now();
           window['_cstore'] = window['_cstore'] || {};
           window['_cstore'][storeId] = description;
@@ -1875,10 +1880,13 @@ function exportSessionCSV(sessionId, sessionDate) {
   records.forEach(r => {
     const srcs = (r.sources||[]).map(s => s.label + ': ' + s.url);
     const capPlace = r.place.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
-    const fullDesc = r.fact ? `You got this stamp by visiting ${capPlace}.\n\n${r.fact}` : '';
+    // Airport entries have no stamp intro (stampIntro is empty string)
+    const isAirport = !r.stampIntro;
+    const fullDesc = r.fact
+      ? (isAirport ? r.fact : `${r.stampIntro || 'You got this stamp by visiting ' + capPlace + '.'}\n\n${r.fact}`)
+      : '';
     rows.push([r.place, r.country||'', fullDesc, (r.fact||'').length, r.fact ? 'Verified' : 'Failed', srcs[0]||'', srcs[1]||'', srcs[2]||'']);
   });
-  // Label filename with session datetime
   const dateSlug = sessionDate ? new Date(sessionDate).toISOString().replace(/[:.]/g,'-').substring(0,19) : 'session';
   downloadCSV(rows, `facts-session-${dateSlug}.csv`);
 }
@@ -2153,7 +2161,13 @@ async function generateAirportBatch() {
       try {
         const description = await generateAirportDescription(name, city, lastErr);
         airportResults[i].description = description;
-        dbAddEntry(name, description, [], CURRENT_SESSION_ID, city, '');
+        try {
+          dbAddEntry(name, description, [], CURRENT_SESSION_ID, city, '');
+          updateBadge();
+          console.log('✅ Saved to history:', name, '| Session:', CURRENT_SESSION_ID, '| Total records:', dbLoad().length);
+        } catch(dbErr) {
+          console.warn('❌ History save failed:', dbErr);
+        }
 
         const storeId = 'a_' + i + '_' + Date.now();
         window['_cstore'] = window['_cstore'] || {};
