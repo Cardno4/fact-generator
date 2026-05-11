@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Fact Generator v46</title>
+  <title>Fact Generator v47</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -292,7 +292,7 @@
 <div class="container" id="app-screen">
   <div class="topbar">
     <div class="topbar-left">
-      <h1>Fact Generator <span style="font-size:13px;font-weight:400;color:#bbb;letter-spacing:0.02em">v46</span></h1>
+      <h1>Fact Generator <span style="font-size:13px;font-weight:400;color:#bbb;letter-spacing:0.02em">v47</span></h1>
       <p>One verified stamp description per place — shown with stamp framing line, factual claim confirmed before display</p>
     </div>
     <div class="topbar-right">
@@ -2082,10 +2082,18 @@ STRICTLY AVOID — these produce generic, dull descriptions:
 - "One of the busiest airports in [region]" constructions
 - Comparisons to football pitches or other size analogies
 
+ALSO STRICTLY AVOID — these fail the traveller tone test:
+- Human displacement, forced relocation or resettlement of residents or communities
+- Environmental destruction, deforestation or ecological damage caused by construction
+- Any fact that implies harm to people or nature, however historically accurate
+- Two unrelated facts joined together in one sentence — the description must be about a single connected idea with clear logical flow from start to finish
+
+FOR ANY SPECIFIC LARGE NUMBER (over 100,000 people, over 1 million of anything, over 100 million cubic metres): only include it if you are highly confident it is verifiable from Wikipedia or an official source. If in doubt, use a different angle entirely rather than risk an unverifiable figure.
+
 GOOD ANGLES TO EXPLORE:
 - How and when the airport was built, especially unusual construction methods or location challenges
 - Architectural innovations in terminal design
-- Historical firsts — first jet bridges, first to open in a region, wartime history
+- Historical firsts — first jet bridges, first to open in a region, notable milestones
 - Unusual location facts — built on reclaimed land, extreme altitude, island sites
 - Unique features that distinguish this airport from all others
 - Famous or surprising connections to art, culture, or the city it serves
@@ -2093,21 +2101,48 @@ GOOD ANGLES TO EXPLORE:
 TONE: Factual, grounded, encyclopaedic. The same tone as a well-written travel stamp description. Not promotional. No travel brochure language.
 
 STRICT RULES:
-- Single complete sentence only
+- Single complete sentence only, about ONE connected idea
 - Between 200 and 280 characters — HARD limits. If the fact is strong at under 250, do not pad it. Only exceed 250 if genuinely needed for the sentence to be complete and specific.
 - Factually accurate and verifiable
 - No em dashes (—) under any circumstances — use commas or restructure
 - No words: "houses", "spanning", "significant", "nestled", "boasts", "sprawling"
-- Do NOT mention wars, conflicts, or anything that would make a visitor uncomfortable${retryHint}
+- Do NOT mention wars, conflicts, human displacement, or environmental damage${retryHint}
 
 Respond ONLY with valid JSON, no markdown:
-{"description": "the single sentence here"}`, 350);
+{"description": "the single sentence here", "confidence": 8}`, 350);
 
   const parsed = JSON.parse(raw);
   if (!parsed.description) throw new Error('No description returned');
   const len = parsed.description.length;
   if (len < 200 || len > 280) throw new Error(`Length out of range: ${len} chars (need 200-280)`);
   if (parsed.description.includes('\u2014') || parsed.description.includes('\u2013')) throw new Error('Em dash detected');
+
+  // Improvement 3: raise confidence threshold for descriptions containing large specific numbers
+  const hasLargeNumber = /\b\d{1,3}(,\d{3})+|\b\d{6,}\b|\b\d+\s*(million|billion|trillion)/i.test(parsed.description);
+  const confidenceThreshold = hasLargeNumber ? 8 : 6;
+  const confidence = parsed.confidence || 7;
+  if (confidence < confidenceThreshold) {
+    throw new Error(`Low confidence (${confidence}/10) on a description containing a large specific number — replaced with a safer angle`);
+  }
+
+  // Improvement 2: coherence check — flag descriptions that appear to join two unrelated facts
+  const verifyRaw = await callClaude(`You are a quality checker for travel stamp descriptions. Review this airport description:
+
+"${parsed.description}"
+
+Check for TWO issues:
+
+1. COHERENCE: Does the sentence describe a single connected idea with clear logical flow, or does it awkwardly join two unrelated facts? (e.g. "The airport opened in 1929 AND separately Terminal 4 has a cable roof" = two unrelated facts = FAIL)
+
+2. TONE: Does the description mention or imply human displacement, forced relocation, environmental destruction, deforestation, or harm to people or nature? If yes = FAIL regardless of how historically accurate it is.
+
+Respond ONLY with valid JSON, no markdown:
+{"coherent": true, "tone_ok": true, "issue": "brief description of problem if any check failed, or empty string"}`, 200);
+
+  const verify = JSON.parse(verifyRaw);
+  if (!verify.coherent) throw new Error(`Incoherent description — two unrelated facts joined: ${verify.issue}`);
+  if (!verify.tone_ok) throw new Error(`Tone failure — ${verify.issue}`);
+
   return parsed.description;
 }
 
